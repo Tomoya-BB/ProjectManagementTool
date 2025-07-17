@@ -7,6 +7,7 @@ All required assets such as Bootstrap and Plotly are bundled inside the `static/
 - Add, edit and delete tasks
 - Gantt and burndown charts with Plotly
 - Multiple project files selectable at start
+- Milestone tasks with zero duration
 
 ## Setup
 1. Install dependencies

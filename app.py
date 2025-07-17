@@ -127,12 +127,13 @@ def tasks():
     tasks = Task.query.all()
     df = pd.DataFrame([
         {
-            'name': t.name,
+            'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
             'start': t.start_date,
             'finish': t.end_date if not t.is_milestone else t.start_date,
             'assigned': t.assigned_to or 'Unassigned',
             'progress': t.progress,
-            'depends': t.depends_on.name if t.depends_on else ''
+            'depends': t.depends_on.name if t.depends_on else '',
+            'type': 'Milestone' if t.is_milestone else 'Task'
         }
         for t in tasks
     ])
@@ -142,9 +143,9 @@ def tasks():
             x_start="start",
             x_end="finish",
             y="name",
-            color="progress",
+            color="type",
             hover_data={"assigned": True, "progress": True, "depends": True},
-            color_continuous_scale="Blues",
+            color_discrete_map={"Task": "#1f77b4", "Milestone": "#d62728"},
         )
         fig.update_yaxes(autorange="reversed")
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
@@ -165,6 +166,8 @@ def add_task():
         assigned_to = request.form.get('assigned_to')
         depends_on_id = request.form.get('depends_on_id') or None
         is_milestone = 'is_milestone' in request.form
+        if is_milestone:
+            end_date = start_date
         task = Task(
             name=name,
             start_date=start_date,
@@ -195,6 +198,8 @@ def edit_task(task_id):
         depends_on_id = request.form.get('depends_on_id') or None
         task.depends_on_id = depends_on_id
         task.is_milestone = 'is_milestone' in request.form
+        if task.is_milestone:
+            task.end_date = task.start_date
         db.session.commit()
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()

@@ -23,7 +23,7 @@
             <td>{{ task.assigned_to or '' }}</td>
             <td>{{ task.progress }}</td>
             <td>{{ task.depends_on.name if task.depends_on else '' }}</td>
-            <td>{% if task.is_milestone %}&#9733;{% endif %}</td>
+            <td>{% if task.is_milestone %}&#9670;{% endif %}</td>
             <td>
                 {% if current_user.is_authenticated and current_user.role in ['Admin', 'User'] %}
                 <a href="{{ url_for('edit_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">Edit</a>
