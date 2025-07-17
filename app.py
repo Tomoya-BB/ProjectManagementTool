@@ -6,7 +6,7 @@ from flask import Flask, render_template, redirect, url_for, request, session, a
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from models import db, Task, User, Project
+from models import db, Task, User, Project, Resource
 import pandas as pd
 import plotly.express as px
 
@@ -135,6 +135,55 @@ def create_project():
     return render_template('project_create.html')
 
 
+@app.route('/resources')
+@login_required
+@roles_required('Admin', 'User')
+def resources():
+    res = Resource.query.all()
+    return render_template('resources.html', resources=res)
+
+
+@app.route('/resource/add', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin', 'User')
+def add_resource():
+    if request.method == 'POST':
+        name = request.form['name']
+        role = request.form.get('role')
+        color = request.form.get('color')
+        utilization = int(request.form.get('utilization') or 100)
+        r = Resource(name=name, role=role, color=color, utilization=utilization)
+        db.session.add(r)
+        db.session.commit()
+        return redirect(url_for('resources'))
+    return render_template('resource_form.html', resource=None)
+
+
+@app.route('/resource/<int:resource_id>/edit', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin', 'User')
+def edit_resource(resource_id):
+    resource = Resource.query.get_or_404(resource_id)
+    if request.method == 'POST':
+        resource.name = request.form['name']
+        resource.role = request.form.get('role')
+        resource.color = request.form.get('color')
+        resource.utilization = int(request.form.get('utilization') or 100)
+        db.session.commit()
+        return redirect(url_for('resources'))
+    return render_template('resource_form.html', resource=resource)
+
+
+@app.route('/resource/<int:resource_id>/delete', methods=['POST'])
+@login_required
+@roles_required('Admin', 'User')
+def delete_resource(resource_id):
+    resource = Resource.query.get_or_404(resource_id)
+    db.session.delete(resource)
+    db.session.commit()
+    return redirect(url_for('resources'))
+
+
 @app.route('/')
 @login_required
 def tasks():
@@ -147,7 +196,7 @@ def tasks():
             'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
             'start': t.start_date,
             'finish': t.end_date if not t.is_milestone else t.start_date,
-            'assigned': t.assigned_to or 'Unassigned',
+            'Resource': t.resource.name if t.resource else 'Unassigned',
             'progress': t.progress,
             'depends': t.depends_on.name if t.depends_on else '',
             'type': 'Milestone' if t.is_milestone else 'Task'
@@ -155,14 +204,15 @@ def tasks():
         for t in tasks
     ])
     if not df.empty:
+        color_map = {r.name: r.color for r in Resource.query.all() if r.color}
         fig = px.timeline(
             df,
             x_start="start",
             x_end="finish",
             y="name",
-            color="type",
-            hover_data={"assigned": True, "progress": True, "depends": True},
-            color_discrete_map={"Task": "#1f77b4", "Milestone": "#d62728"},
+            color="Resource",
+            hover_data={"progress": True, "depends": True},
+            color_discrete_map=color_map,
         )
         fig.update_yaxes(autorange="reversed")
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
@@ -180,7 +230,7 @@ def add_task():
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         progress = int(request.form['progress'])
-        assigned_to = request.form.get('assigned_to')
+        resource_id = request.form.get('resource_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         is_milestone = 'is_milestone' in request.form
         if is_milestone:
@@ -190,7 +240,7 @@ def add_task():
             start_date=start_date,
             end_date=end_date,
             progress=progress,
-            assigned_to=assigned_to,
+            resource_id=resource_id,
             depends_on_id=depends_on_id,
             is_milestone=is_milestone,
         )
@@ -198,7 +248,8 @@ def add_task():
         db.session.commit()
         return redirect(url_for('tasks'))
     tasks = Task.query.all()
-    return render_template('form.html', task=None, tasks=tasks)
+    resources = Resource.query.all()
+    return render_template('form.html', task=None, tasks=tasks, resources=resources)
 
 
 @app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
@@ -211,7 +262,7 @@ def edit_task(task_id):
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         task.progress = int(request.form['progress'])
-        task.assigned_to = request.form.get('assigned_to')
+        task.resource_id = request.form.get('resource_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         task.depends_on_id = depends_on_id
         task.is_milestone = 'is_milestone' in request.form
@@ -220,7 +271,8 @@ def edit_task(task_id):
         db.session.commit()
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()
-    return render_template('form.html', task=task, tasks=tasks)
+    resources = Resource.query.all()
+    return render_template('form.html', task=task, tasks=tasks, resources=resources)
 
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Resources</h1>
+<a href="{{ url_for('add_resource') }}" class="btn btn-primary mb-3">Add Resource</a>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Color</th>
+            <th>Utilization (%)</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in resources %}
+        <tr>
+            <td>{{ r.name }}</td>
+            <td>{{ r.role or '' }}</td>
+            <td><span style="background-color: {{ r.color }}; padding: 4px 8px; display:inline-block;">{{ r.color }}</span></td>
+            <td>{{ r.utilization }}</td>
+            <td>
+                <a href="{{ url_for('edit_resource', resource_id=r.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                <form action="{{ url_for('delete_resource', resource_id=r.id) }}" method="post" style="display:inline-block">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
