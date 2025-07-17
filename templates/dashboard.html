@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1 class="mb-4">Dashboard</h1>
+<div class="mb-4">
+{{ gantt|safe }}
+</div>
 <div>
 {{ chart|safe }}
 </div>
