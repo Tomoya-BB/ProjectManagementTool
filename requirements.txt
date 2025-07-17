@@ -1,4 +1,5 @@
 Flask
 Flask_SQLAlchemy
+Flask_Login
 pandas
 plotly
