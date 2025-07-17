@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Initial Setup</h1>
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Create Admin</button>
+</form>
+{% endblock %}

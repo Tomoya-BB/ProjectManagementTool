@@ -18,6 +18,23 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    """Create the initial admin user if none exist."""
+    if User.query.first():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        admin = User(username=username,
+                     password_hash=generate_password_hash(password),
+                     role='Admin')
+        db.session.add(admin)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template('setup.html')
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -59,23 +76,23 @@ def init_db(project_name):
             project = Project(name=project_name, path=db_path)
             db.session.add(project)
 
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', password_hash=generate_password_hash('admin'), role='Admin')
-            db.session.add(admin)
-
         db.session.commit()
 
 
 @app.before_request
 def load_project():
     project = session.get('project')
-    allowed = ('select_project', 'create_project', 'login', 'static')
+    allowed = ('select_project', 'create_project', 'login', 'setup', 'static')
     if not project and request.endpoint not in allowed:
         return redirect(url_for('select_project'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if not getattr(app, 'db_initialized', False):
+        init_db('project1')
+    if not User.query.first():
+        return redirect(url_for('setup'))
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
