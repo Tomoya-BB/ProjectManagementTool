@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1 class="mb-4">{{ 'Edit Task' if task else 'Add Task' }}</h1>
-<form method="post">
+<form method="post" id="taskForm">
     <div class="mb-3">
         <label class="form-label">Name</label>
         <input type="text" name="name" value="{{ task.name if task else '' }}" class="form-control" required>

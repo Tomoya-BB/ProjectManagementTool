@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, render_template, redirect, url_for, request, session, abort
+from flask import Flask, render_template, redirect, url_for, request, session, abort, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -155,6 +155,7 @@ def add_resource():
         r = Resource(name=name, role=role, color=color, utilization=utilization)
         db.session.add(r)
         db.session.commit()
+        flash('Resource added', 'success')
         return redirect(url_for('resources'))
     return render_template('resource_form.html', resource=None)
 
@@ -170,6 +171,7 @@ def edit_resource(resource_id):
         resource.color = request.form.get('color')
         resource.utilization = int(request.form.get('utilization') or 100)
         db.session.commit()
+        flash('Resource updated', 'success')
         return redirect(url_for('resources'))
     return render_template('resource_form.html', resource=resource)
 
@@ -181,6 +183,7 @@ def delete_resource(resource_id):
     resource = Resource.query.get_or_404(resource_id)
     db.session.delete(resource)
     db.session.commit()
+    flash('Resource deleted', 'success')
     return redirect(url_for('resources'))
 
 
@@ -254,6 +257,7 @@ def add_task():
         )
         db.session.add(task)
         db.session.commit()
+        flash('Task added', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.all()
     resources = Resource.query.all()
@@ -277,6 +281,7 @@ def edit_task(task_id):
         if task.is_milestone:
             task.end_date = task.start_date
         db.session.commit()
+        flash('Task updated', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()
     resources = Resource.query.all()
@@ -290,6 +295,7 @@ def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
     db.session.commit()
+    flash('Task deleted', 'success')
     return redirect(url_for('tasks'))
 
 
