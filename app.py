@@ -192,6 +192,7 @@ def tasks():
         return redirect(url_for('select_project'))
     scale = request.args.get('scale', 'day')
     tasks = Task.query.all()
+    resources = Resource.query.all()
     df = pd.DataFrame([
         {
             'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
@@ -225,7 +226,7 @@ def tasks():
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
     else:
         gantt = ''
-    return render_template('tasks.html', tasks=tasks, gantt=gantt, scale=scale)
+    return render_template('tasks.html', tasks=tasks, resources=resources, gantt=gantt, scale=scale)
 
 
 @app.route('/task/add', methods=['GET', 'POST'])
@@ -290,6 +291,26 @@ def delete_task(task_id):
     db.session.delete(task)
     db.session.commit()
     return redirect(url_for('tasks'))
+
+
+@app.route('/task/update', methods=['POST'])
+@login_required
+@roles_required('Admin', 'User')
+def update_task():
+    data = request.get_json()
+    task_id = data.get('id')
+    task = Task.query.get_or_404(task_id)
+    task.name = data.get('name', task.name)
+    task.start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
+    task.end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d').date()
+    task.progress = int(data.get('progress', task.progress))
+    task.resource_id = data.get('resource_id') or None
+    task.depends_on_id = data.get('depends_on_id') or None
+    task.is_milestone = data.get('is_milestone', False)
+    if task.is_milestone:
+        task.end_date = task.start_date
+    db.session.commit()
+    return {'status': 'ok'}
 
 
 @app.route('/dashboard')
