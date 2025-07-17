@@ -18,4 +18,5 @@ All required assets such as Bootstrap and Plotly are bundled inside the `static/
    ```bash
    python app.py
    ```
-3. Access `http://localhost:5000` and choose a project to start.
+3. On first launch, you will be prompted to create an admin account.
+4. Access `http://localhost:5000` and choose a project to start.
