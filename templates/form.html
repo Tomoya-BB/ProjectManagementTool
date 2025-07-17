@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">{{ 'Edit Task' if task else 'Add Task' }}</h1>
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input type="text" name="name" value="{{ task.name if task else '' }}" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Start Date</label>
+        <input type="date" name="start_date" value="{{ task.start_date if task else '' }}" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">End Date</label>
+        <input type="date" name="end_date" value="{{ task.end_date if task else '' }}" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Progress (%)</label>
+        <input type="number" name="progress" min="0" max="100" value="{{ task.progress if task else 0 }}" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endblock %}
