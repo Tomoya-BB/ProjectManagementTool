@@ -205,15 +205,15 @@ def tasks():
         for t in tasks
     ])
     if not df.empty:
-        color_map = {r.name: r.color for r in Resource.query.all() if r.color}
         fig = px.timeline(
             df,
             x_start="start",
             x_end="finish",
             y="name",
-            color="Resource",
-            hover_data={"progress": True, "depends": True},
-            color_discrete_map=color_map,
+            color="progress",
+            hover_data={"Resource": True, "progress": True, "depends": True},
+            color_continuous_scale="RdYlGn",
+            range_color=[0, 100],
         )
         fig.update_yaxes(autorange="reversed")
         if scale == 'month':
@@ -296,18 +296,49 @@ def delete_task(task_id):
 @login_required
 def dashboard():
     tasks = Task.query.order_by(Task.end_date).all()
-    if not tasks:
-        chart = ''
-    else:
-        df = pd.DataFrame({
-            'date': [t.end_date for t in tasks],
-            'remaining': [100 - t.progress for t in tasks]
+    gantt = ''
+    chart = ''
+    if tasks:
+        df = pd.DataFrame([
+            {
+                'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
+                'start': t.start_date,
+                'finish': t.end_date if not t.is_milestone else t.start_date,
+                'Resource': t.resource.name if t.resource else 'Unassigned',
+                'progress': t.progress,
+                'depends': t.depends_on.name if t.depends_on else '',
+            }
+            for t in tasks
+        ])
+        fig_gantt = px.timeline(
+            df,
+            x_start="start",
+            x_end="finish",
+            y="name",
+            color="progress",
+            hover_data={"Resource": True, "progress": True, "depends": True},
+            color_continuous_scale="RdYlGn",
+            range_color=[0, 100],
+        )
+        fig_gantt.update_yaxes(autorange="reversed")
+        gantt = fig_gantt.to_html(full_html=False, include_plotlyjs=False)
+
+        start = df['start'].min()
+        end = df['finish'].max()
+        dates = pd.date_range(start, end)
+        data = []
+        for d in dates:
+            remaining = sum((100 - t.progress) / 100 for t in tasks if t.end_date >= d.date())
+            data.append({'date': d.date(), 'remaining': remaining})
+        burn_df = pd.DataFrame(data)
+        ideal = pd.DataFrame({
+            'date': dates,
+            'remaining': burn_df['remaining'].iloc[0] - burn_df['remaining'].iloc[0] / (len(dates) - 1) * burn_df.index
         })
-        df = df.sort_values('date')
-        df['remaining_total'] = df['remaining'].cumsum()
-        fig = px.line(df, x='date', y='remaining_total', title='Burndown Chart')
-        chart = fig.to_html(full_html=False)
-    return render_template('dashboard.html', chart=chart)
+        fig = px.line(burn_df, x='date', y='remaining', markers=True, labels={'remaining': 'Remaining Work'}, title='Burndown Chart')
+        fig.add_scatter(x=ideal['date'], y=ideal['remaining'], mode='lines', name='Ideal', line=dict(dash='dash'))
+        chart = fig.to_html(full_html=False, include_plotlyjs=False)
+    return render_template('dashboard.html', chart=chart, gantt=gantt)
 
 
 if __name__ == '__main__':

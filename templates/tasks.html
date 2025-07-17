@@ -29,7 +29,11 @@
             <td>{{ task.start_date }}</td>
             <td>{{ task.end_date }}</td>
             <td>{{ task.resource.name if task.resource else '' }}</td>
-            <td>{{ task.progress }}</td>
+            <td>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: {{ task.progress }}%;" aria-valuenow="{{ task.progress }}" aria-valuemin="0" aria-valuemax="100">{{ task.progress }}%</div>
+                </div>
+            </td>
             <td>{{ task.depends_on.name if task.depends_on else '' }}</td>
             <td>{% if task.is_milestone %}&#9670;{% endif %}</td>
             <td>
