@@ -19,3 +19,12 @@ class Task(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     progress = db.Column(db.Integer, default=0)
+
+
+class Project(db.Model):
+    """Project metadata stored in the master database."""
+
+    __bind_key__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    path = db.Column(db.String(255), nullable=False)

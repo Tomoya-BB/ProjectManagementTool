@@ -6,7 +6,7 @@ from flask import Flask, render_template, redirect, url_for, request, session, a
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from models import db, Task, User
+from models import db, Task, User, Project
 import pandas as pd
 import plotly.figure_factory as ff
 import plotly.express as px
@@ -38,25 +38,40 @@ def roles_required(*roles):
 
 
 def init_db(project_name):
+    """Initialize databases for the given project and master data."""
+
     base = os.path.abspath(os.path.dirname(__file__))
-    os.makedirs(os.path.join(base, 'data', 'projects'), exist_ok=True)
-    db_path = os.path.join(base, 'data', 'projects', f'{project_name}.db')
+    projects_dir = os.path.join(base, 'data', 'projects')
+    os.makedirs(projects_dir, exist_ok=True)
+    db_path = os.path.join(projects_dir, f'{project_name}.db')
     master_path = os.path.join(base, 'data', 'master.db')
+
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_BINDS'] = {'users': f'sqlite:///{master_path}'}
-    db.init_app(app)
+
+    if not getattr(app, 'db_initialized', False):
+        db.init_app(app)
+        app.db_initialized = True
+
     with app.app_context():
         db.create_all()
+
+        if not Project.query.filter_by(name=project_name).first():
+            project = Project(name=project_name, path=db_path)
+            db.session.add(project)
+
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin', password_hash=generate_password_hash('admin'), role='Admin')
             db.session.add(admin)
-            db.session.commit()
+
+        db.session.commit()
 
 
 @app.before_request
 def load_project():
     project = session.get('project')
-    if not project and request.endpoint not in ('select_project', 'login', 'static'):
+    allowed = ('select_project', 'create_project', 'login', 'static')
+    if not project and request.endpoint not in allowed:
         return redirect(url_for('select_project'))
 
 
@@ -83,13 +98,25 @@ def logout():
 @login_required
 @roles_required('Admin', 'User')
 def select_project():
-    projects = [p[:-3] for p in os.listdir('data/projects') if p.endswith('.db')]
+    projects = [p.name for p in Project.query.order_by(Project.name).all()]
     if request.method == 'POST':
         project = request.form['project']
         session['project'] = project
         init_db(project)
         return redirect(url_for('tasks'))
     return render_template('project_select.html', projects=projects)
+
+
+@app.route('/project/create', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin')
+def create_project():
+    if request.method == 'POST':
+        name = request.form['name']
+        session['project'] = name
+        init_db(name)
+        return redirect(url_for('tasks'))
+    return render_template('project_create.html')
 
 
 @app.route('/')
