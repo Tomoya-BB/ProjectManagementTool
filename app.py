@@ -159,11 +159,23 @@ def add_task():
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         progress = int(request.form['progress'])
-        task = Task(name=name, start_date=start_date, end_date=end_date, progress=progress)
+        assigned_to = request.form.get('assigned_to')
+        depends_on_id = request.form.get('depends_on_id') or None
+        is_milestone = 'is_milestone' in request.form
+        task = Task(
+            name=name,
+            start_date=start_date,
+            end_date=end_date,
+            progress=progress,
+            assigned_to=assigned_to,
+            depends_on_id=depends_on_id,
+            is_milestone=is_milestone,
+        )
         db.session.add(task)
         db.session.commit()
         return redirect(url_for('tasks'))
-    return render_template('form.html', task=None)
+    tasks = Task.query.all()
+    return render_template('form.html', task=None, tasks=tasks)
 
 
 @app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
@@ -176,9 +188,14 @@ def edit_task(task_id):
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         task.progress = int(request.form['progress'])
+        task.assigned_to = request.form.get('assigned_to')
+        depends_on_id = request.form.get('depends_on_id') or None
+        task.depends_on_id = depends_on_id
+        task.is_milestone = 'is_milestone' in request.form
         db.session.commit()
         return redirect(url_for('tasks'))
-    return render_template('form.html', task=task)
+    tasks = Task.query.filter(Task.id != task_id).all()
+    return render_template('form.html', task=task, tasks=tasks)
 
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])

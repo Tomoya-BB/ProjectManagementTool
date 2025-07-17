@@ -15,6 +15,23 @@
         <input type="date" name="end_date" value="{{ task.end_date if task else '' }}" class="form-control" required>
     </div>
     <div class="mb-3">
+        <label class="form-label">Assignee</label>
+        <input type="text" name="assigned_to" value="{{ task.assigned_to if task else '' }}" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Depends On</label>
+        <select name="depends_on_id" class="form-select">
+            <option value="">-- None --</option>
+            {% for t in tasks %}
+            <option value="{{ t.id }}" {% if task and task.depends_on_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-check mb-3">
+        <input type="checkbox" name="is_milestone" class="form-check-input" id="milestone" {% if task and task.is_milestone %}checked{% endif %}>
+        <label for="milestone" class="form-check-label">Milestone</label>
+    </div>
+    <div class="mb-3">
         <label class="form-label">Progress (%)</label>
         <input type="number" name="progress" min="0" max="100" value="{{ task.progress if task else 0 }}" class="form-control" required>
     </div>
