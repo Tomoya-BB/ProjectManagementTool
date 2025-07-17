@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 
@@ -19,6 +21,11 @@ class Task(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     progress = db.Column(db.Integer, default=0)
+    assigned_to = db.Column(db.String(100))
+    depends_on_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+    depends_on = db.relationship('Task', remote_side=[id])
+    is_milestone = db.Column(db.Boolean, default=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Project(db.Model):
