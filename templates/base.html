@@ -13,6 +13,7 @@
         <div>
             {% if current_user.is_authenticated and current_user.role in ['Admin', 'User'] %}
             <a class="nav-link d-inline" href="{{ url_for('add_task') }}">Add Task</a>
+            <a class="nav-link d-inline" href="{{ url_for('resources') }}">Resources</a>
             {% endif %}
             <a class="nav-link d-inline" href="{{ url_for('dashboard') }}">Dashboard</a>
             {% if current_user.is_authenticated %}

@@ -15,13 +15,22 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='User')
 
+class Resource(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(100))
+    color = db.Column(db.String(20))
+    utilization = db.Column(db.Integer, default=100)
+
+
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     progress = db.Column(db.Integer, default=0)
-    assigned_to = db.Column(db.String(100))
+    resource_id = db.Column(db.Integer, db.ForeignKey('resource.id'))
+    resource = db.relationship('Resource')
     depends_on_id = db.Column(db.Integer, db.ForeignKey('task.id'))
     depends_on = db.relationship('Task', remote_side=[id])
     is_milestone = db.Column(db.Boolean, default=False)

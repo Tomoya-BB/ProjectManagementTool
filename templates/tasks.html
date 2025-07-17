@@ -20,7 +20,7 @@
             <td>{{ task.name }}</td>
             <td>{{ task.start_date }}</td>
             <td>{{ task.end_date }}</td>
-            <td>{{ task.assigned_to or '' }}</td>
+            <td>{{ task.resource.name if task.resource else '' }}</td>
             <td>{{ task.progress }}</td>
             <td>{{ task.depends_on.name if task.depends_on else '' }}</td>
             <td>{% if task.is_milestone %}&#9670;{% endif %}</td>

@@ -16,7 +16,12 @@
     </div>
     <div class="mb-3">
         <label class="form-label">Assignee</label>
-        <input type="text" name="assigned_to" value="{{ task.assigned_to if task else '' }}" class="form-control">
+        <select name="resource_id" class="form-select">
+            <option value="">-- None --</option>
+            {% for r in resources %}
+            <option value="{{ r.id }}" {% if task and task.resource_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+            {% endfor %}
+        </select>
     </div>
     <div class="mb-3">
         <label class="form-label">Depends On</label>
