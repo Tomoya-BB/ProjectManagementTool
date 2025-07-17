@@ -8,7 +8,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from models import db, Task, User, Project
 import pandas as pd
-import plotly.figure_factory as ff
 import plotly.express as px
 
 app = Flask(__name__)
@@ -128,23 +127,27 @@ def tasks():
     tasks = Task.query.all()
     df = pd.DataFrame([
         {
-            'Task': t.name,
-            'Start': t.start_date,
-            'Finish': t.end_date,
-            'Complete': t.progress
+            'name': t.name,
+            'start': t.start_date,
+            'finish': t.end_date if not t.is_milestone else t.start_date,
+            'assigned': t.assigned_to or 'Unassigned',
+            'progress': t.progress,
+            'depends': t.depends_on.name if t.depends_on else ''
         }
         for t in tasks
     ])
     if not df.empty:
-        fig = ff.create_gantt(
+        fig = px.timeline(
             df,
-            index_col='Complete',
-            show_colorbar=True,
-            bar_width=0.2,
-            showgrid_x=True,
-            showgrid_y=True
+            x_start="start",
+            x_end="finish",
+            y="name",
+            color="progress",
+            hover_data={"assigned": True, "progress": True, "depends": True},
+            color_continuous_scale="Blues",
         )
-        gantt = fig.to_html(full_html=False)
+        fig.update_yaxes(autorange="reversed")
+        gantt = fig.to_html(full_html=False, include_plotlyjs=False)
     else:
         gantt = ''
     return render_template('tasks.html', tasks=tasks, gantt=gantt)
