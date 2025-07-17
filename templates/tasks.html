@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1 class="mb-4">Tasks</h1>
+{% if current_user.is_authenticated and current_user.role in ['Admin', 'User'] %}
+<a href="{{ url_for('add_task') }}" class="btn btn-primary mb-3">
+    <img src="{{ url_for('static', filename='icons/plus.svg') }}" class="icon me-1" alt=""> Add Task
+</a>
+{% endif %}
 <form method="get" id="scaleForm" class="mb-3">
     <label for="scale" class="me-2">View:</label>
     <select name="scale" id="scale" onchange="document.getElementById('scaleForm').submit()" class="form-select d-inline w-auto">
@@ -47,10 +52,12 @@
                         data-depends-on-id="{{ task.depends_on_id }}"
                         data-progress="{{ task.progress }}"
                         data-is-milestone="{{ task.is_milestone }}">
-                    Edit
+                    <img src="{{ url_for('static', filename='icons/pencil.svg') }}" class="icon" alt="Edit">
                 </button>
                 <form action="{{ url_for('delete_task', task_id=task.id) }}" method="post" style="display:inline-block">
-                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <img src="{{ url_for('static', filename='icons/trash.svg') }}" class="icon" alt="Delete">
+                    </button>
                 </form>
                 {% endif %}
             </td>
