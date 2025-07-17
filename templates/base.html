@@ -39,9 +39,26 @@
 <div class="container">
     {% block content %}{% endblock %}
 </div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index:11">
+  {% for category, message in messages %}
+  <div class="toast align-items-center text-bg-{{ 'success' if category=='success' else 'danger' if category=='error' else 'info' }} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body">{{ message }}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endwith %}
 <script src="{{ url_for('static', filename='libs/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#toastContainer .toast').forEach(el => new bootstrap.Toast(el).show());
+});
+</script>
 </body>
 </html>
