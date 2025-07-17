@@ -190,6 +190,7 @@ def tasks():
     project = session.get('project')
     if not project:
         return redirect(url_for('select_project'))
+    scale = request.args.get('scale', 'day')
     tasks = Task.query.all()
     df = pd.DataFrame([
         {
@@ -215,10 +216,16 @@ def tasks():
             color_discrete_map=color_map,
         )
         fig.update_yaxes(autorange="reversed")
+        if scale == 'month':
+            fig.update_xaxes(dtick="M1")
+        elif scale == 'week':
+            fig.update_xaxes(dtick="D7")
+        else:
+            fig.update_xaxes(dtick="D1")
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
     else:
         gantt = ''
-    return render_template('tasks.html', tasks=tasks, gantt=gantt)
+    return render_template('tasks.html', tasks=tasks, gantt=gantt, scale=scale)
 
 
 @app.route('/task/add', methods=['GET', 'POST'])

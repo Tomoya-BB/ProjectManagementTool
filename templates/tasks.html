@@ -1,6 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1 class="mb-4">Tasks</h1>
+<form method="get" id="scaleForm" class="mb-3">
+    <label for="scale" class="me-2">View:</label>
+    <select name="scale" id="scale" onchange="document.getElementById('scaleForm').submit()" class="form-select d-inline w-auto">
+        <option value="day" {% if scale == 'day' %}selected{% endif %}>Day</option>
+        <option value="week" {% if scale == 'week' %}selected{% endif %}>Week</option>
+        <option value="month" {% if scale == 'month' %}selected{% endif %}>Month</option>
+    </select>
+</form>
 <table class="table">
     <thead>
         <tr>
