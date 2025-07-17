@@ -3,21 +3,25 @@
 <head>
     <meta charset="utf-8">
     <title>Project Management Tool</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('index') }}">ProjectTool</a>
+        <a class="navbar-brand" href="{{ url_for('tasks') }}">ProjectTool</a>
         <div>
             <a class="nav-link d-inline" href="{{ url_for('add_task') }}">Add Task</a>
-            <a class="nav-link d-inline" href="{{ url_for('burndown') }}">Burndown</a>
+            <a class="nav-link d-inline" href="{{ url_for('dashboard') }}">Dashboard</a>
         </div>
     </div>
 </nav>
 <div class="container">
     {% block content %}{% endblock %}
 </div>
-<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='libs/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

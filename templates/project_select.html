@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Select Project</h1>
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Project Name</label>
+        <select name="project" class="form-select">
+        {% for project in projects %}
+            <option value="{{ project }}">{{ project }}</option>
+        {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Open</button>
+</form>
+{% endblock %}
