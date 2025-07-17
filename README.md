@@ -1,13 +1,12 @@
 # Project Management Tool
 
-This repository contains a simple web-based project management application built with Flask. It provides basic task management with Gantt chart and burndown visualization. All assets are served locally so the application can run in an offline environment.
+This project is a small Flask based project management application. Tasks are stored per project in individual SQLite databases under `data/projects/` and global settings reside in `data/master.db`.
+All required assets such as Bootstrap and Plotly are bundled inside the `static/` folder so the app works offline.
 
 ## Features
 - Add, edit and delete tasks
-- Visualize tasks in a Gantt chart using Plotly
-- Simple burndown chart
-- Uses SQLite for storage
-- Bootstrap 5 UI served from the local `static` folder
+- Gantt and burndown charts with Plotly
+- Multiple project files selectable at start
 
 ## Setup
 1. Install dependencies
@@ -18,6 +17,4 @@ This repository contains a simple web-based project management application built
    ```bash
    python app.py
    ```
-3. Open your browser at `http://localhost:5000`.
-
-The database file `project.db` will be created automatically in the project directory.
+3. Access `http://localhost:5000` and choose a project to start.

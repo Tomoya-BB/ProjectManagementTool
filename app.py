@@ -1,27 +1,49 @@
+import os
 from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, request
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, redirect, url_for, request, session
+from models import db, Task
 import pandas as pd
 import plotly.figure_factory as ff
 import plotly.express as px
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///project.db'
+app.secret_key = 'dev'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+
+def init_db(project_name):
+    base = os.path.abspath(os.path.dirname(__file__))
+    os.makedirs(os.path.join(base, 'data', 'projects'), exist_ok=True)
+    db_path = os.path.join(base, 'data', 'projects', f'{project_name}.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
 
 
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    progress = db.Column(db.Integer, default=0)
+@app.before_request
+def load_project():
+    project = session.get('project')
+    if not project and request.endpoint not in ('select_project', 'static'):
+        return redirect(url_for('select_project'))
+
+
+@app.route('/select', methods=['GET', 'POST'])
+def select_project():
+    projects = [p[:-3] for p in os.listdir('data/projects') if p.endswith('.db')]
+    if request.method == 'POST':
+        project = request.form['project']
+        session['project'] = project
+        init_db(project)
+        return redirect(url_for('tasks'))
+    return render_template('project_select.html', projects=projects)
 
 
 @app.route('/')
-def index():
+def tasks():
+    project = session.get('project')
+    if not project:
+        return redirect(url_for('select_project'))
     tasks = Task.query.all()
     df = pd.DataFrame([
         {
@@ -44,7 +66,7 @@ def index():
         gantt = fig.to_html(full_html=False)
     else:
         gantt = ''
-    return render_template('index.html', tasks=tasks, gantt=gantt)
+    return render_template('tasks.html', tasks=tasks, gantt=gantt)
 
 
 @app.route('/task/add', methods=['GET', 'POST'])
@@ -57,7 +79,7 @@ def add_task():
         task = Task(name=name, start_date=start_date, end_date=end_date, progress=progress)
         db.session.add(task)
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('tasks'))
     return render_template('form.html', task=None)
 
 
@@ -70,7 +92,7 @@ def edit_task(task_id):
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         task.progress = int(request.form['progress'])
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('tasks'))
     return render_template('form.html', task=task)
 
 
@@ -79,11 +101,11 @@ def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
     db.session.commit()
-    return redirect(url_for('index'))
+    return redirect(url_for('tasks'))
 
 
-@app.route('/burndown')
-def burndown():
+@app.route('/dashboard')
+def dashboard():
     tasks = Task.query.order_by(Task.end_date).all()
     if not tasks:
         chart = ''
@@ -96,10 +118,9 @@ def burndown():
         df['remaining_total'] = df['remaining'].cumsum()
         fig = px.line(df, x='date', y='remaining_total', title='Burndown Chart')
         chart = fig.to_html(full_html=False)
-    return render_template('burndown.html', chart=chart)
+    return render_template('dashboard.html', chart=chart)
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    init_db('project1')
     app.run(debug=True)
