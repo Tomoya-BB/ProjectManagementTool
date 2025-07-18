@@ -27,38 +27,56 @@ class Resource(db.Model):
 class Member(db.Model):
     """Project team member."""
 
+    __tablename__ = 'members'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
 
+    def __repr__(self):
+        return f'<Member {self.name}>'
+
 
 class Task(db.Model):
+    __tablename__ = 'tasks'
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
-    progress = db.Column(db.Integer, default=0)
-    remarks = db.Column(db.Text)
-    parent_id = db.Column(db.Integer, db.ForeignKey('task.id'))
-    parent = db.relationship('Task', remote_side=[id])
-    assignee_id = db.Column(db.Integer, db.ForeignKey('member.id'))
-    assignee = db.relationship('Member')
+    remarks = db.Column(db.Text, nullable=True)
+    progress = db.Column(db.Integer, nullable=False, default=0)
+    parent_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)
+    assignee_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)
+    # relationships
+    children = db.relationship(
+        'Task', backref=db.backref('parent', remote_side=[id])
+    )
+    assignee = db.relationship(
+        'Member', backref=db.backref('tasks', lazy='dynamic')
+    )
     resource_id = db.Column(db.Integer, db.ForeignKey('resource.id'))
     resource = db.relationship('Resource')
-    depends_on_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+    depends_on_id = db.Column(db.Integer, db.ForeignKey('tasks.id'))
     depends_on = db.relationship('Task', remote_side=[id])
     is_milestone = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    def __repr__(self):
+        return f'<Task {self.name}>'
+
 
 class TaskDependency(db.Model):
-    """Many-to-many dependency between tasks."""
+    __tablename__ = 'task_dependencies'
 
     id = db.Column(db.Integer, primary_key=True)
-    predecessor_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    successor_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    predecessor = db.relationship('Task', foreign_keys=[predecessor_id])
-    successor = db.relationship('Task', foreign_keys=[successor_id])
-    __table_args__ = (db.UniqueConstraint('predecessor_id', 'successor_id'),)
+    predecessor_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    successor_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    # relationships
+    predecessor = db.relationship(
+        'Task', foreign_keys=[predecessor_id], backref='successor_links'
+    )
+    successor = db.relationship(
+        'Task', foreign_keys=[successor_id], backref='predecessor_links'
+    )
 
 
 class Project(db.Model):
