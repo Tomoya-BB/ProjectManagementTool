@@ -187,6 +187,18 @@ def delete_resource(resource_id):
     return redirect(url_for('resources'))
 
 
+@app.route('/index')
+@login_required
+def index():
+    """Project overview metrics."""
+    tasks = Task.query.all()
+    total = len(tasks)
+    completed = sum(1 for t in tasks if t.progress == 100)
+    avg_progress = int(sum(t.progress for t in tasks) / total) if total else 0
+    return render_template('index.html', total=total, completed=completed,
+                           avg_progress=avg_progress)
+
+
 @app.route('/')
 @login_required
 def tasks():
