@@ -1,11 +1,12 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h1 class="mb-4">Open Project</h1>
-<form method="post" enctype="multipart/form-data">
+<h2>🔁 プロジェクトを開く</h2>
+<form method="POST" enctype="multipart/form-data" class="mb-3">
   <div class="mb-3">
-    <label class="form-label">Project File (project.json)</label>
-    <input type="file" name="project_file" class="form-control" required>
+    <label class="form-label">プロジェクトファイル (project.json) を選択</label>
+    <input type="file" name="project_file" class="form-control" accept=".json" required>
   </div>
-  <button type="submit" class="btn btn-primary">Open</button>
+  <button type="submit" class="btn btn-info">開く</button>
 </form>
+<p class="text-muted">選択したプロジェクトフォルダ内の <code>db.sqlite3</code> を読み込みます。</p>
 {% endblock %}

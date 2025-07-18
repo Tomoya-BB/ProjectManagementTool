@@ -1,15 +1,17 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h1 class="mb-4">New Project</h1>
-<form method="post">
+<h2>💾 新規プロジェクト作成</h2>
+<form method="POST" class="mb-3">
   <div class="mb-3">
-    <label class="form-label">Project Name</label>
+    <label class="form-label">プロジェクト名</label>
     <input type="text" name="project_name" class="form-control" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">Save Directory</label>
-    <input type="text" name="save_path" class="form-control" required>
+    <label class="form-label">保存先フォルダパス</label>
+    <input type="text" name="save_path" class="form-control" placeholder="例: C:\projects または /home/user/projects" required>
+    <!-- ※GUIでのフォルダ選択はブラウザの制限上困難なため、手動でパスを入力 -->
   </div>
-  <button type="submit" class="btn btn-primary">Create</button>
+  <button type="submit" class="btn btn-primary">作成</button>
 </form>
+<p class="text-muted">指定フォルダに <code>「プロジェクト名」/project.json</code> および <code>db.sqlite3</code> を保存します。</p>
 {% endblock %}
