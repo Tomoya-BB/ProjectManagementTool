@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+import json
+from datetime import datetime, date, timedelta
 from functools import wraps
 
 from flask import Flask, render_template, redirect, url_for, request, session, abort, flash
@@ -13,6 +14,9 @@ import plotly.express as px
 app = Flask(__name__)
 app.secret_key = 'dev'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Keep track of currently opened project directory
+current_project_path = None
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -53,13 +57,16 @@ def roles_required(*roles):
     return decorator
 
 
-def init_db(project_name):
+def init_db(project_name, db_path=None):
     """Initialize databases for the given project and master data."""
 
     base = os.path.abspath(os.path.dirname(__file__))
-    projects_dir = os.path.join(base, 'data', 'projects')
-    os.makedirs(projects_dir, exist_ok=True)
-    db_path = os.path.join(projects_dir, f'{project_name}.db')
+    if db_path is None:
+        projects_dir = os.path.join(base, 'data', 'projects')
+        os.makedirs(projects_dir, exist_ok=True)
+        db_path = os.path.join(projects_dir, f'{project_name}.db')
+    else:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
     master_path = os.path.join(base, 'data', 'master.db')
 
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
@@ -97,7 +104,7 @@ def init_db(project_name):
 @app.before_request
 def load_project():
     project = session.get('project')
-    allowed = ('select_project', 'create_project', 'login', 'setup', 'static')
+    allowed = ('select_project', 'create_project', 'new_project', 'open_project', 'login', 'setup', 'static')
     if not project and request.endpoint not in allowed:
         return redirect(url_for('select_project'))
 
@@ -114,7 +121,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
-            return redirect(url_for('tasks'))
+            return redirect(url_for('dashboard'))
     return render_template('login.html')
 
 
@@ -134,7 +141,7 @@ def select_project():
         project = request.form['project']
         session['project'] = project
         init_db(project)
-        return redirect(url_for('tasks'))
+        return redirect(url_for('dashboard'))
     return render_template('project_select.html', projects=projects)
 
 
@@ -146,8 +153,53 @@ def create_project():
         name = request.form['name']
         session['project'] = name
         init_db(name)
-        return redirect(url_for('tasks'))
+        return redirect(url_for('dashboard'))
     return render_template('project_create.html')
+
+
+@app.route('/project/new', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin')
+def new_project():
+    """Create a new project folder with sqlite db and json."""
+    if request.method == 'POST':
+        proj_name = request.form['project_name']
+        save_dir = request.form['save_path']
+        project_dir = os.path.join(save_dir, proj_name)
+        os.makedirs(project_dir, exist_ok=True)
+        proj_info = {"name": proj_name, "db_file": "db.sqlite3"}
+        with open(os.path.join(project_dir, 'project.json'), 'w', encoding='utf-8') as f:
+            json.dump(proj_info, f, ensure_ascii=False, indent=4)
+        db_path = os.path.join(project_dir, 'db.sqlite3')
+        init_db(proj_name, db_path)
+        global current_project_path
+        current_project_path = project_dir
+        session['project'] = proj_name
+        flash(f"New project '{proj_name}' created at {project_dir}", 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('new_project.html')
+
+
+@app.route('/project/open', methods=['GET', 'POST'])
+@login_required
+def open_project():
+    if request.method == 'POST':
+        file = request.files.get('project_file')
+        if file:
+            proj_info = json.load(file)
+            proj_dir = os.path.dirname(file.filename) or os.path.join(app.root_path, 'data', 'projects', proj_info.get('name'))
+            db_path = os.path.join(proj_dir, proj_info.get('db_file', 'db.sqlite3'))
+            if os.path.exists(db_path):
+                init_db(proj_info.get('name'), db_path)
+                global current_project_path
+                current_project_path = proj_dir
+                session['project'] = proj_info.get('name')
+                flash(f"Project '{proj_info.get('name')}' opened.", 'info')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Database file not found.', 'danger')
+                return redirect(url_for('open_project'))
+    return render_template('open_project.html')
 
 
 @app.route('/resources')
@@ -158,49 +210,48 @@ def resources():
     return render_template('resources.html', resources=res)
 
 
-@app.route('/members')
+@app.route('/members', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'Editor')
 def members():
-    mem = Member.query.all()
-    return render_template('members.html', members=mem)
-
-
-@app.route('/member/add', methods=['GET', 'POST'])
-@login_required
-@roles_required('Admin', 'Editor')
-def add_member():
     if request.method == 'POST':
-        name = request.form['name']
-        m = Member(name=name)
-        db.session.add(m)
-        db.session.commit()
-        flash('Member added', 'success')
+        if current_user.role != 'Admin':
+            abort(403)
+        name = request.form['name'].strip()
+        if name:
+            db.session.add(Member(name=name))
+            db.session.commit()
+            flash(f"メンバー「{name}」を追加しました。", 'success')
         return redirect(url_for('members'))
-    return render_template('member_form.html', member=None)
+    all_members = Member.query.order_by(Member.name).all()
+    return render_template('members.html', members=all_members)
+
+
 
 
 @app.route('/member/<int:member_id>/edit', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'Editor')
 def edit_member(member_id):
     member = Member.query.get_or_404(member_id)
+    if current_user.role != 'Admin':
+        abort(403)
     if request.method == 'POST':
         member.name = request.form['name']
         db.session.commit()
         flash('Member updated', 'success')
         return redirect(url_for('members'))
-    return render_template('member_form.html', member=member)
+    return render_template('members.html', member=member, members=Member.query.all())
 
 
 @app.route('/member/<int:member_id>/delete', methods=['POST'])
 @login_required
-@roles_required('Admin', 'Editor')
 def delete_member(member_id):
+    if current_user.role != 'Admin':
+        abort(403)
     member = Member.query.get_or_404(member_id)
     db.session.delete(member)
+    Task.query.filter_by(assignee_id=member.id).update({'assignee_id': None})
     db.session.commit()
-    flash('Member deleted', 'success')
+    flash(f"メンバー「{member.name}」を削除しました。", 'info')
     return redirect(url_for('members'))
 
 
@@ -260,15 +311,46 @@ def index():
                            avg_progress=avg_progress)
 
 
+@app.route('/tasks', methods=['GET', 'POST'])
 @app.route('/')
 @login_required
 def tasks():
     project = session.get('project')
     if not project:
         return redirect(url_for('select_project'))
+
+    if request.method == 'POST':
+        if current_user.role == 'Viewer':
+            abort(403)
+        name = request.form['name']
+        start = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
+        end = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
+        remarks = request.form.get('remarks', '')
+        assignee_id = request.form.get('assignee_id', type=int)
+        progress = int(request.form.get('progress', 0))
+        parent_id = request.form.get('parent_id', type=int)
+        task = Task(name=name, start_date=start, end_date=end,
+                    remarks=remarks, progress=progress,
+                    assignee_id=assignee_id, parent_id=parent_id)
+        db.session.add(task)
+        db.session.commit()
+        predecessors = request.form.getlist('predecessors')
+        for pid in predecessors:
+            try:
+                pid = int(pid)
+            except ValueError:
+                continue
+            if pid and pid != task.id:
+                db.session.add(TaskDependency(predecessor_id=pid, successor_id=task.id))
+        db.session.commit()
+        flash(f"New task '{name}' added.", 'success')
+        return redirect(url_for('tasks'))
+
     scale = request.args.get('scale', 'day')
-    tasks = Task.query.all()
+    tasks = Task.query.order_by(Task.start_date).all()
     members = Member.query.all()
+    deps = TaskDependency.query.all()
+
     df = pd.DataFrame([
         {
             'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
@@ -276,7 +358,7 @@ def tasks():
             'finish': t.end_date if not t.is_milestone else t.start_date,
             'Resource': t.assignee.name if t.assignee else 'Unassigned',
             'progress': t.progress,
-            'depends': t.depends_on.name if t.depends_on else '',
+            'depends': ','.join(str(d.predecessor_id) for d in t.predecessor_links),
             'type': 'Milestone' if t.is_milestone else 'Task'
         }
         for t in tasks
@@ -302,7 +384,7 @@ def tasks():
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
     else:
         gantt = ''
-    return render_template('tasks.html', tasks=tasks, members=members, gantt=gantt, scale=scale)
+    return render_template('tasks.html', tasks=tasks, members=members, deps=deps, gantt=gantt, scale=scale)
 
 
 @app.route('/task/add', methods=['GET', 'POST'])
@@ -339,33 +421,47 @@ def add_task():
 
 @app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'Editor')
 def edit_task(task_id):
     task = Task.query.get_or_404(task_id)
+    if current_user.role == 'Viewer':
+        abort(403)
     if request.method == 'POST':
         task.name = request.form['name']
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        task.progress = int(request.form['progress'])
-        task.assignee_id = request.form.get('assignee_id') or None
-        depends_on_id = request.form.get('depends_on_id') or None
-        task.depends_on_id = depends_on_id
+        task.remarks = request.form.get('remarks', '')
+        task.progress = int(request.form.get('progress', task.progress))
+        task.assignee_id = request.form.get('assignee_id', type=int)
+        task.parent_id = request.form.get('parent_id', type=int)
         task.is_milestone = 'is_milestone' in request.form
         if task.is_milestone:
             task.end_date = task.start_date
+        db.session.commit()
+        TaskDependency.query.filter_by(successor_id=task.id).delete()
+        predecessors = request.form.getlist('predecessors')
+        for pid in predecessors:
+            try:
+                pid = int(pid)
+            except ValueError:
+                continue
+            if pid and pid != task.id:
+                db.session.add(TaskDependency(predecessor_id=pid, successor_id=task.id))
         db.session.commit()
         flash('Task updated', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()
     members = Member.query.all()
-    return render_template('form.html', task=task, tasks=tasks, members=members)
+    deps = TaskDependency.query.all()
+    return render_template('form.html', task=task, tasks=tasks, members=members, deps=deps)
 
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])
 @login_required
-@roles_required('Admin', 'Editor')
 def delete_task(task_id):
+    if current_user.role not in ['Admin', 'Editor']:
+        abort(403)
     task = Task.query.get_or_404(task_id)
+    TaskDependency.query.filter((TaskDependency.predecessor_id == task.id) | (TaskDependency.successor_id == task.id)).delete()
     db.session.delete(task)
     db.session.commit()
     flash('Task deleted', 'success')
@@ -382,12 +478,21 @@ def update_task():
     task.name = data.get('name', task.name)
     task.start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
     task.end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d').date()
+    task.remarks = data.get('remarks', task.remarks)
     task.progress = int(data.get('progress', task.progress))
     task.assignee_id = data.get('assignee_id') or None
-    task.depends_on_id = data.get('depends_on_id') or None
+    task.parent_id = data.get('parent_id') or None
     task.is_milestone = data.get('is_milestone', False)
     if task.is_milestone:
         task.end_date = task.start_date
+    TaskDependency.query.filter_by(successor_id=task.id).delete()
+    for pid in data.get('predecessors', []):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            continue
+        if pid and pid != task.id:
+            db.session.add(TaskDependency(predecessor_id=pid, successor_id=task.id))
     db.session.commit()
     return {'status': 'ok'}
 
@@ -395,50 +500,29 @@ def update_task():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    tasks = Task.query.order_by(Task.end_date).all()
-    gantt = ''
-    chart = ''
-    if tasks:
-        df = pd.DataFrame([
-            {
-                'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
-                'start': t.start_date,
-                'finish': t.end_date if not t.is_milestone else t.start_date,
-                'Resource': t.resource.name if t.resource else 'Unassigned',
-                'progress': t.progress,
-                'depends': t.depends_on.name if t.depends_on else '',
-            }
-            for t in tasks
-        ])
-        fig_gantt = px.timeline(
-            df,
-            x_start="start",
-            x_end="finish",
-            y="name",
-            color="progress",
-            hover_data={"Resource": True, "progress": True, "depends": True},
-            color_continuous_scale="RdYlGn",
-            range_color=[0, 100],
-        )
-        fig_gantt.update_yaxes(autorange="reversed")
-        gantt = fig_gantt.to_html(full_html=False, include_plotlyjs=False)
+    tasks = Task.query.all()
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for t in tasks if t.progress == 100)
+    overdue_tasks = sum(1 for t in tasks if t.progress < 100 and t.end_date < date.today())
+    progress_rate = int(completed_tasks / total_tasks * 100) if total_tasks else 0
 
-        start = df['start'].min()
-        end = df['finish'].max()
-        dates = pd.date_range(start, end)
-        data = []
-        for d in dates:
-            remaining = sum((100 - t.progress) / 100 for t in tasks if t.end_date >= d.date())
-            data.append({'date': d.date(), 'remaining': remaining})
-        burn_df = pd.DataFrame(data)
-        ideal = pd.DataFrame({
-            'date': dates,
-            'remaining': burn_df['remaining'].iloc[0] - burn_df['remaining'].iloc[0] / (len(dates) - 1) * burn_df.index
-        })
-        fig = px.line(burn_df, x='date', y='remaining', markers=True, labels={'remaining': 'Remaining Work'}, title='Burndown Chart')
-        fig.add_scatter(x=ideal['date'], y=ideal['remaining'], mode='lines', name='Ideal', line=dict(dash='dash'))
-        chart = fig.to_html(full_html=False, include_plotlyjs=False)
-    return render_template('dashboard.html', chart=chart, gantt=gantt)
+    remaining_by_date = []
+    if total_tasks:
+        start_date = min(t.start_date for t in tasks)
+        end_date = max(t.end_date for t in tasks)
+        cur_date = start_date
+        while cur_date <= end_date:
+            remaining = sum(1 for t in tasks if t.progress < 100 and t.end_date >= cur_date)
+            remaining_by_date.append({"date": cur_date.strftime("%Y-%m-%d"), "remaining": remaining})
+            cur_date += timedelta(days=1)
+
+    return render_template('index.html', **{
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "overdue_tasks": overdue_tasks,
+        "progress_rate": progress_rate,
+        "remaining_by_date": remaining_by_date
+    })
 
 
 if __name__ == '__main__':
