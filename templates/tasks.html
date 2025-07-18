@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1 class="mb-4">Tasks</h1>
-{% if current_user.is_authenticated and current_user.role in ['Admin', 'User'] %}
+{% if current_user.is_authenticated and current_user.role in ['Admin', 'Editor'] %}
 <a href="{{ url_for('add_task') }}" class="btn btn-primary mb-3">
     <img src="{{ url_for('static', filename='icons/plus.svg') }}" class="icon me-1" alt=""> Add Task
 </a>
@@ -33,7 +33,7 @@
             <td>{{ task.name }}</td>
             <td>{{ task.start_date }}</td>
             <td>{{ task.end_date }}</td>
-            <td>{{ task.resource.name if task.resource else '' }}</td>
+            <td>{{ task.assignee.name if task.assignee else '' }}</td>
             <td>
                 <div class="progress">
                     <div class="progress-bar" role="progressbar" style="width: {{ task.progress }}%;" aria-valuenow="{{ task.progress }}" aria-valuemin="0" aria-valuemax="100">{{ task.progress }}%</div>
@@ -42,13 +42,13 @@
             <td>{{ task.depends_on.name if task.depends_on else '' }}</td>
             <td>{% if task.is_milestone %}&#9670;{% endif %}</td>
             <td>
-                {% if current_user.is_authenticated and current_user.role in ['Admin', 'User'] %}
+                {% if current_user.is_authenticated and current_user.role in ['Admin', 'Editor'] %}
                 <button type="button" class="btn btn-sm btn-secondary edit-task-btn"
                         data-id="{{ task.id }}"
                         data-name="{{ task.name }}"
                         data-start="{{ task.start_date }}"
                         data-end="{{ task.end_date }}"
-                        data-resource-id="{{ task.resource_id }}"
+                        data-assignee-id="{{ task.assignee_id }}"
                         data-depends-on-id="{{ task.depends_on_id }}"
                         data-progress="{{ task.progress }}"
                         data-is-milestone="{{ task.is_milestone }}">
@@ -90,10 +90,10 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Assignee</label>
-          <select name="resource_id" class="form-select">
+          <select name="assignee_id" class="form-select">
             <option value="">-- None --</option>
-            {% for r in resources %}
-            <option value="{{ r.id }}">{{ r.name }}</option>
+            {% for m in members %}
+            <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}
           </select>
         </div>

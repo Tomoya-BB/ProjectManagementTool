@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.querySelector('input[name="name"]').value = btn.dataset.name;
         modal.querySelector('input[name="start_date"]').value = btn.dataset.start;
         modal.querySelector('input[name="end_date"]').value = btn.dataset.end;
-        modal.querySelector('select[name="resource_id"]').value = btn.dataset.resourceId || '';
+        modal.querySelector('select[name="assignee_id"]').value = btn.dataset.assigneeId || '';
         modal.querySelector('select[name="depends_on_id"]').value = btn.dataset.dependsOnId || '';
         modal.querySelector('input[name="is_milestone"]').checked = btn.dataset.isMilestone === 'True';
         modalProgress.value = btn.dataset.progress;
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
             start_date: modal.querySelector('input[name="start_date"]').value,
             end_date: modal.querySelector('input[name="end_date"]').value,
             progress: modalProgress.value,
-            resource_id: modal.querySelector('select[name="resource_id"]').value || null,
+            assignee_id: modal.querySelector('select[name="assignee_id"]').value || null,
             depends_on_id: modal.querySelector('select[name="depends_on_id"]').value || null,
             is_milestone: modal.querySelector('input[name="is_milestone"]').checked
           })

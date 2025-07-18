@@ -6,7 +6,7 @@ from flask import Flask, render_template, redirect, url_for, request, session, a
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from models import db, Task, User, Project, Resource
+from models import db, Task, User, Project, Resource, Member, TaskDependency
 import pandas as pd
 import plotly.express as px
 
@@ -72,6 +72,21 @@ def init_db(project_name):
     with app.app_context():
         db.create_all()
 
+        engine = db.get_engine(app)
+        cols = [c[1] for c in engine.execute("PRAGMA table_info(task)").fetchall()]
+        if 'remarks' not in cols:
+            engine.execute('ALTER TABLE task ADD COLUMN remarks TEXT')
+        if 'parent_id' not in cols:
+            engine.execute('ALTER TABLE task ADD COLUMN parent_id INTEGER')
+        if 'assignee_id' not in cols:
+            engine.execute('ALTER TABLE task ADD COLUMN assignee_id INTEGER')
+
+        user_engine = db.get_engine(app, bind='users')
+        ucols = [c[1] for c in user_engine.execute("PRAGMA table_info(user)").fetchall()]
+        if 'role' not in ucols:
+            user_engine.execute("ALTER TABLE user ADD COLUMN role VARCHAR DEFAULT 'Viewer'")
+            user_engine.execute("UPDATE user SET role='Viewer'")
+
         if not Project.query.filter_by(name=project_name).first():
             project = Project(name=project_name, path=db_path)
             db.session.add(project)
@@ -112,7 +127,7 @@ def logout():
 
 @app.route('/select', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def select_project():
     projects = [p.name for p in Project.query.order_by(Project.name).all()]
     if request.method == 'POST':
@@ -137,15 +152,61 @@ def create_project():
 
 @app.route('/resources')
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def resources():
     res = Resource.query.all()
     return render_template('resources.html', resources=res)
 
 
+@app.route('/members')
+@login_required
+@roles_required('Admin', 'Editor')
+def members():
+    mem = Member.query.all()
+    return render_template('members.html', members=mem)
+
+
+@app.route('/member/add', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin', 'Editor')
+def add_member():
+    if request.method == 'POST':
+        name = request.form['name']
+        m = Member(name=name)
+        db.session.add(m)
+        db.session.commit()
+        flash('Member added', 'success')
+        return redirect(url_for('members'))
+    return render_template('member_form.html', member=None)
+
+
+@app.route('/member/<int:member_id>/edit', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin', 'Editor')
+def edit_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    if request.method == 'POST':
+        member.name = request.form['name']
+        db.session.commit()
+        flash('Member updated', 'success')
+        return redirect(url_for('members'))
+    return render_template('member_form.html', member=member)
+
+
+@app.route('/member/<int:member_id>/delete', methods=['POST'])
+@login_required
+@roles_required('Admin', 'Editor')
+def delete_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    db.session.delete(member)
+    db.session.commit()
+    flash('Member deleted', 'success')
+    return redirect(url_for('members'))
+
+
 @app.route('/resource/add', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def add_resource():
     if request.method == 'POST':
         name = request.form['name']
@@ -162,7 +223,7 @@ def add_resource():
 
 @app.route('/resource/<int:resource_id>/edit', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def edit_resource(resource_id):
     resource = Resource.query.get_or_404(resource_id)
     if request.method == 'POST':
@@ -178,7 +239,7 @@ def edit_resource(resource_id):
 
 @app.route('/resource/<int:resource_id>/delete', methods=['POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def delete_resource(resource_id):
     resource = Resource.query.get_or_404(resource_id)
     db.session.delete(resource)
@@ -207,13 +268,13 @@ def tasks():
         return redirect(url_for('select_project'))
     scale = request.args.get('scale', 'day')
     tasks = Task.query.all()
-    resources = Resource.query.all()
+    members = Member.query.all()
     df = pd.DataFrame([
         {
             'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
             'start': t.start_date,
             'finish': t.end_date if not t.is_milestone else t.start_date,
-            'Resource': t.resource.name if t.resource else 'Unassigned',
+            'Resource': t.assignee.name if t.assignee else 'Unassigned',
             'progress': t.progress,
             'depends': t.depends_on.name if t.depends_on else '',
             'type': 'Milestone' if t.is_milestone else 'Task'
@@ -241,19 +302,19 @@ def tasks():
         gantt = fig.to_html(full_html=False, include_plotlyjs=False)
     else:
         gantt = ''
-    return render_template('tasks.html', tasks=tasks, resources=resources, gantt=gantt, scale=scale)
+    return render_template('tasks.html', tasks=tasks, members=members, gantt=gantt, scale=scale)
 
 
 @app.route('/task/add', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def add_task():
     if request.method == 'POST':
         name = request.form['name']
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         progress = int(request.form['progress'])
-        resource_id = request.form.get('resource_id') or None
+        assignee_id = request.form.get('assignee_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         is_milestone = 'is_milestone' in request.form
         if is_milestone:
@@ -263,7 +324,7 @@ def add_task():
             start_date=start_date,
             end_date=end_date,
             progress=progress,
-            resource_id=resource_id,
+            assignee_id=assignee_id,
             depends_on_id=depends_on_id,
             is_milestone=is_milestone,
         )
@@ -272,13 +333,13 @@ def add_task():
         flash('Task added', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.all()
-    resources = Resource.query.all()
-    return render_template('form.html', task=None, tasks=tasks, resources=resources)
+    members = Member.query.all()
+    return render_template('form.html', task=None, tasks=tasks, members=members)
 
 
 @app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def edit_task(task_id):
     task = Task.query.get_or_404(task_id)
     if request.method == 'POST':
@@ -286,7 +347,7 @@ def edit_task(task_id):
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         task.progress = int(request.form['progress'])
-        task.resource_id = request.form.get('resource_id') or None
+        task.assignee_id = request.form.get('assignee_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         task.depends_on_id = depends_on_id
         task.is_milestone = 'is_milestone' in request.form
@@ -296,13 +357,13 @@ def edit_task(task_id):
         flash('Task updated', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()
-    resources = Resource.query.all()
-    return render_template('form.html', task=task, tasks=tasks, resources=resources)
+    members = Member.query.all()
+    return render_template('form.html', task=task, tasks=tasks, members=members)
 
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
@@ -313,7 +374,7 @@ def delete_task(task_id):
 
 @app.route('/task/update', methods=['POST'])
 @login_required
-@roles_required('Admin', 'User')
+@roles_required('Admin', 'Editor')
 def update_task():
     data = request.get_json()
     task_id = data.get('id')
@@ -322,7 +383,7 @@ def update_task():
     task.start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
     task.end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d').date()
     task.progress = int(data.get('progress', task.progress))
-    task.resource_id = data.get('resource_id') or None
+    task.assignee_id = data.get('assignee_id') or None
     task.depends_on_id = data.get('depends_on_id') or None
     task.is_milestone = data.get('is_milestone', False)
     if task.is_milestone:
