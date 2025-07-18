@@ -8,8 +8,6 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from models import db, Task, User, Project, Resource, Member, TaskDependency
-import pandas as pd
-import plotly.express as px
 
 app = Flask(__name__)
 app.secret_key = 'dev'
@@ -346,45 +344,19 @@ def tasks():
         flash(f"New task '{name}' added.", 'success')
         return redirect(url_for('tasks'))
 
-    scale = request.args.get('scale', 'day')
     tasks = Task.query.order_by(Task.start_date).all()
     members = Member.query.all()
     deps = TaskDependency.query.all()
-
-    df = pd.DataFrame([
-        {
-            'name': f'\u25C6 {t.name}' if t.is_milestone else t.name,
-            'start': t.start_date,
-            'finish': t.end_date if not t.is_milestone else t.start_date,
-            'Resource': t.assignee.name if t.assignee else 'Unassigned',
-            'progress': t.progress,
-            'depends': ','.join(str(d.predecessor_id) for d in t.predecessor_links),
-            'type': 'Milestone' if t.is_milestone else 'Task'
-        }
-        for t in tasks
-    ])
-    if not df.empty:
-        fig = px.timeline(
-            df,
-            x_start="start",
-            x_end="finish",
-            y="name",
-            color="progress",
-            hover_data={"Resource": True, "progress": True, "depends": True},
-            color_continuous_scale="RdYlGn",
-            range_color=[0, 100],
-        )
-        fig.update_yaxes(autorange="reversed")
-        if scale == 'month':
-            fig.update_xaxes(dtick="M1")
-        elif scale == 'week':
-            fig.update_xaxes(dtick="D7")
-        else:
-            fig.update_xaxes(dtick="D1")
-        gantt = fig.to_html(full_html=False, include_plotlyjs=False)
-    else:
-        gantt = ''
-    return render_template('tasks.html', tasks=tasks, members=members, deps=deps, gantt=gantt, scale=scale)
+    current_date = date.today()
+    day = timedelta(days=1)
+    return render_template(
+        'tasks.html',
+        tasks=tasks,
+        members=members,
+        deps=deps,
+        current_date=current_date,
+        day=day,
+    )
 
 
 @app.route('/task/add', methods=['GET', 'POST'])

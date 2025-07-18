@@ -2,3 +2,13 @@
 .gantt-container {
     overflow-x: auto;
 }
+.gantt-bar {
+    height: 1.2rem;
+    color: #fff;
+    padding: 0 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+.bar-complete { background-color: #28a745; }
+.bar-ongoing { background-color: #0d6efd; }
+.bar-delayed { background-color: #dc3545; }
