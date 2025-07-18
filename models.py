@@ -48,7 +48,8 @@ class Task(db.Model):
     assignee_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)
     # relationships
     children = db.relationship(
-        'Task', backref=db.backref('parent', remote_side=[id])
+        'Task', backref=db.backref('parent', remote_side=[id]),
+        foreign_keys=[parent_id]
     )
     assignee = db.relationship(
         'Member', backref=db.backref('tasks', lazy='dynamic')
@@ -56,7 +57,8 @@ class Task(db.Model):
     resource_id = db.Column(db.Integer, db.ForeignKey('resource.id'))
     resource = db.relationship('Resource')
     depends_on_id = db.Column(db.Integer, db.ForeignKey('tasks.id'))
-    depends_on = db.relationship('Task', remote_side=[id])
+    depends_on = db.relationship('Task', remote_side=[id],
+                                foreign_keys=[depends_on_id])
     is_milestone = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

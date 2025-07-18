@@ -6,6 +6,7 @@ from functools import wraps
 from flask import Flask, render_template, redirect, url_for, request, session, abort, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text
 
 from models import db, Task, User, Project, Resource, Member, TaskDependency
 
@@ -77,20 +78,26 @@ def init_db(project_name, db_path=None):
     with app.app_context():
         db.create_all()
 
-        engine = db.get_engine(app)
-        cols = [c[1] for c in engine.execute("PRAGMA table_info(tasks)").fetchall()]
+        engine = db.get_engine()
+        with engine.connect() as conn:
+            cols = [c[1] for c in conn.execute(text("PRAGMA table_info(tasks)")).fetchall()]
         if 'remarks' not in cols:
-            engine.execute('ALTER TABLE tasks ADD COLUMN remarks TEXT')
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE tasks ADD COLUMN remarks TEXT'))
         if 'parent_id' not in cols:
-            engine.execute('ALTER TABLE tasks ADD COLUMN parent_id INTEGER')
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE tasks ADD COLUMN parent_id INTEGER'))
         if 'assignee_id' not in cols:
-            engine.execute('ALTER TABLE tasks ADD COLUMN assignee_id INTEGER')
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE tasks ADD COLUMN assignee_id INTEGER'))
 
-        user_engine = db.get_engine(app, bind='users')
-        ucols = [c[1] for c in user_engine.execute("PRAGMA table_info(user)").fetchall()]
+        user_engine = db.get_engine(bind_key='users')
+        with user_engine.connect() as conn:
+            ucols = [c[1] for c in conn.execute(text("PRAGMA table_info(user)")).fetchall()]
         if 'role' not in ucols:
-            user_engine.execute("ALTER TABLE user ADD COLUMN role VARCHAR DEFAULT 'Viewer'")
-            user_engine.execute("UPDATE user SET role='Viewer'")
+            with user_engine.begin() as conn:
+                conn.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR DEFAULT 'Viewer'"))
+                conn.execute(text("UPDATE user SET role='Viewer'"))
 
         if not Project.query.filter_by(name=project_name).first():
             project = Project(name=project_name, path=db_path)
