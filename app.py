@@ -210,6 +210,7 @@ def resources():
 
 @app.route('/members', methods=['GET', 'POST'])
 @login_required
+@roles_required('Admin')
 def members():
     if request.method == 'POST':
         if current_user.role != 'Admin':
@@ -228,23 +229,21 @@ def members():
 
 @app.route('/member/<int:member_id>/edit', methods=['GET', 'POST'])
 @login_required
+@roles_required('Admin')
 def edit_member(member_id):
     member = Member.query.get_or_404(member_id)
-    if current_user.role != 'Admin':
-        abort(403)
     if request.method == 'POST':
         member.name = request.form['name']
         db.session.commit()
-        flash('Member updated', 'success')
+        flash('メンバーを更新しました。', 'success')
         return redirect(url_for('members'))
     return render_template('members.html', member=member, members=Member.query.all())
 
 
 @app.route('/member/<int:member_id>/delete', methods=['POST'])
 @login_required
+@roles_required('Admin')
 def delete_member(member_id):
-    if current_user.role != 'Admin':
-        abort(403)
     member = Member.query.get_or_404(member_id)
     db.session.delete(member)
     Task.query.filter_by(assignee_id=member.id).update({'assignee_id': None})
