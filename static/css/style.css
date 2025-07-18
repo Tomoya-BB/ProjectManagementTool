@@ -1,0 +1,4 @@
+/* Additional styles for Gantt chart */
+.gantt-container {
+    overflow-x: auto;
+}

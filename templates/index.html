@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Project Overview</h1>
+<div class="row">
+  <div class="col-md-4">
+    <div class="card text-center mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Total Tasks</h5>
+        <p class="card-text display-6">{{ total }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Completed</h5>
+        <p class="card-text display-6">{{ completed }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Average Progress</h5>
+        <p class="card-text display-6">{{ avg_progress }}%</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
