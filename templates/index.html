@@ -6,7 +6,7 @@
     <div class="card text-center mb-3">
       <div class="card-body">
         <h5 class="card-title">Total Tasks</h5>
-        <p class="card-text display-6">{{ total }}</p>
+        <p class="card-text display-6">{{ total_tasks }}</p>
       </div>
     </div>
   </div>
@@ -14,15 +14,23 @@
     <div class="card text-center mb-3">
       <div class="card-body">
         <h5 class="card-title">Completed</h5>
-        <p class="card-text display-6">{{ completed }}</p>
+        <p class="card-text display-6">{{ completed_tasks }}</p>
       </div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="card text-center mb-3">
       <div class="card-body">
-        <h5 class="card-title">Average Progress</h5>
-        <p class="card-text display-6">{{ avg_progress }}%</p>
+        <h5 class="card-title">Progress Rate</h5>
+        <p class="card-text display-6">{{ progress_rate }}%</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Overdue Tasks</h5>
+        <p class="card-text display-6">{{ overdue_tasks }}</p>
       </div>
     </div>
   </div>

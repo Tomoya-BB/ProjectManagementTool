@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="mb-4">Open Project</h1>
+<form method="post" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label class="form-label">Project File (project.json)</label>
+    <input type="file" name="project_file" class="form-control" required>
+  </div>
+  <button type="submit" class="btn btn-primary">Open</button>
+</form>
+{% endblock %}
