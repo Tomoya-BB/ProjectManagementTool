@@ -73,13 +73,13 @@ def init_db(project_name):
         db.create_all()
 
         engine = db.get_engine(app)
-        cols = [c[1] for c in engine.execute("PRAGMA table_info(task)").fetchall()]
+        cols = [c[1] for c in engine.execute("PRAGMA table_info(tasks)").fetchall()]
         if 'remarks' not in cols:
-            engine.execute('ALTER TABLE task ADD COLUMN remarks TEXT')
+            engine.execute('ALTER TABLE tasks ADD COLUMN remarks TEXT')
         if 'parent_id' not in cols:
-            engine.execute('ALTER TABLE task ADD COLUMN parent_id INTEGER')
+            engine.execute('ALTER TABLE tasks ADD COLUMN parent_id INTEGER')
         if 'assignee_id' not in cols:
-            engine.execute('ALTER TABLE task ADD COLUMN assignee_id INTEGER')
+            engine.execute('ALTER TABLE tasks ADD COLUMN assignee_id INTEGER')
 
         user_engine = db.get_engine(app, bind='users')
         ucols = [c[1] for c in user_engine.execute("PRAGMA table_info(user)").fetchall()]
