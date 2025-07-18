@@ -1,38 +1,91 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h1 class="mb-4">Project Overview</h1>
-<div class="row">
-  <div class="col-md-4">
-    <div class="card text-center mb-3">
+<h2>📊 ダッシュボード: プロジェクト概要</h2>
+<div class="row text-center my-4">
+  <div class="col-md-3">
+    <div class="card border-primary mb-3">
       <div class="card-body">
-        <h5 class="card-title">Total Tasks</h5>
-        <p class="card-text display-6">{{ total_tasks }}</p>
+        <h5 class="card-title">総タスク数</h5>
+        <p class="display-6">{{ total_tasks }}</p>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center mb-3">
+  <div class="col-md-3">
+    <div class="card border-success mb-3">
       <div class="card-body">
-        <h5 class="card-title">Completed</h5>
-        <p class="card-text display-6">{{ completed_tasks }}</p>
+        <h5 class="card-title">完了タスク数</h5>
+        <p class="display-6 text-success">{{ completed_tasks }}</p>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center mb-3">
+  <div class="col-md-3">
+    <div class="card border-warning mb-3">
       <div class="card-body">
-        <h5 class="card-title">Progress Rate</h5>
-        <p class="card-text display-6">{{ progress_rate }}%</p>
+        <h5 class="card-title">進捗率</h5>
+        <p class="display-6">{{ progress_rate }}<small>%</small></p>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center mb-3">
+  <div class="col-md-3">
+    <div class="card border-danger mb-3">
       <div class="card-body">
-        <h5 class="card-title">Overdue Tasks</h5>
-        <p class="card-text display-6">{{ overdue_tasks }}</p>
+        <h5 class="card-title">期限超過</h5>
+        <p class="display-6 text-danger">{{ overdue_tasks }}</p>
       </div>
     </div>
   </div>
 </div>
+
+<div class="row">
+  <div class="col-md-6">
+    <h5>進捗状況</h5>
+    <canvas id="progressChart" width="400" height="300"></canvas>
+  </div>
+  <div class="col-md-6">
+    <h5>バーンダウンチャート</h5>
+    <canvas id="burndownChart" width="400" height="300"></canvas>
+  </div>
+</div>
+
+<!-- Chart.jsの読み込み -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1"></script>
+<script>
+  // 円グラフ: 完了 vs 未完了 タスク数
+  const ctx1 = document.getElementById('progressChart').getContext('2d');
+  const progressChart = new Chart(ctx1, {
+    type: 'doughnut',
+    data: {
+      labels: ['完了', '未完了'],
+      datasets: [{
+        data: [{{ completed_tasks }}, {{ total_tasks - completed_tasks }}],
+        backgroundColor: ['#4caf50', '#cccccc']
+      }]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+  // 折れ線グラフ: 日付別残タスク数 (バーンダウン)
+  const ctx2 = document.getElementById('burndownChart').getContext('2d');
+  const dates = {{ remaining_by_date|map(attribute='date')|list|tojson }};
+  const remaining = {{ remaining_by_date|map(attribute='remaining')|list|tojson }};
+  const burndownChart = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: '残タスク数',
+        data: remaining,
+        borderColor: '#ff6384',
+        fill: false,
+        tension: 0.1
+      }]
+    },
+    options: {
+      scales: {
+        x: { display: false }  // 日付ラベルが多い場合は表示調整
+      }
+    }
+  });
+</script>
 {% endblock %}
