@@ -329,6 +329,9 @@ def tasks():
         name = request.form['name']
         start = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
+        if end < start:
+            flash('End date cannot be before start date.', 'danger')
+            return redirect(url_for('tasks'))
         remarks = request.form.get('remarks', '')
         assignee_id = request.form.get('assignee_id', type=int)
         progress = int(request.form.get('progress', 0))
@@ -373,7 +376,10 @@ def add_task():
         name = request.form['name']
         start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        progress = int(request.form['progress'])
+        if end_date < start_date:
+            flash('End date cannot be before start date.', 'danger')
+            return redirect(url_for('add_task'))
+        progress = int(request.form.get('progress') or 0)
         assignee_id = request.form.get('assignee_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         is_milestone = 'is_milestone' in request.form
