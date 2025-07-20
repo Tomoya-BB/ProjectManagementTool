@@ -109,39 +109,43 @@
 </table>
 
 <!-- ガントチャート表示 -->
-<h3 class="mt-5">ガントチャート</h3>
-<div class="gantt-chart-container" style="overflow-x: auto; position: relative; padding: 1rem; border: 1px solid #ccc;">
-  <!-- 横軸（期間） -->
-  {% set project_start = tasks|map(attribute='start_date')|min %}
-  {% set project_end = tasks|map(attribute='end_date')|max %}
-  {% for d in range((project_end - project_start).days + 1) %}
-    {% set day_label = project_start + d*day %}
-    <div class="gantt-day-label" style="display:inline-block; width:20px;">
-      {{ day_label.day }}{% if day_label.day == 1 %}月{% endif %}
-    </div>
-  {% endfor %}
-  <div class="position-relative" style="margin-top: 1.5rem;">
-    {% for t in tasks %}
-      {% set offset = (t.start_date - project_start).days * 20 %}
-      {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
-      {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
-      <div class="gantt-bar {{ status_class }}" 
-           style="position: absolute; left: {{ offset }}px; width: {{ duration }}px;"
-           title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
-        {{ t.name }}
+{% if tasks %}
+  <h3 class="mt-5">ガントチャート</h3>
+  <div class="gantt-chart-container" style="overflow-x: auto; position: relative; padding: 1rem; border: 1px solid #ccc;">
+    <!-- 横軸（期間） -->
+    {% set project_start = tasks|map(attribute='start_date')|min %}
+    {% set project_end = tasks|map(attribute='end_date')|max %}
+    {% for d in range((project_end - project_start).days + 1) %}
+      {% set day_label = project_start + d*day %}
+      <div class="gantt-day-label" style="display:inline-block; width:20px;">
+        {{ day_label.day }}{% if day_label.day == 1 %}月{% endif %}
       </div>
-      {% for dep in deps if dep.predecessor_id == t.id %}
-        {% set succ_task = tasks|selectattr('id', 'equalto', dep.successor_id)|first %}
-        {% if succ_task %}
-          <div class="gantt-dependency-line" 
-               style="position: absolute; left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px; border-bottom: 2px solid #000;">
-          </div>
-          <div class="gantt-dependency-arrow" 
-               style="position: absolute; left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #000;">
-          </div>
-        {% endif %}
-      {% endfor %}
     {% endfor %}
+    <div class="position-relative" style="margin-top: 1.5rem;">
+      {% for t in tasks %}
+        {% set offset = (t.start_date - project_start).days * 20 %}
+        {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
+        {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
+        <div class="gantt-bar {{ status_class }}"
+             style="position: absolute; left: {{ offset }}px; width: {{ duration }}px;"
+             title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
+          {{ t.name }}
+        </div>
+        {% for dep in deps if dep.predecessor_id == t.id %}
+          {% set succ_task = tasks|selectattr('id', 'equalto', dep.successor_id)|first %}
+          {% if succ_task %}
+            <div class="gantt-dependency-line"
+                 style="position: absolute; left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px; border-bottom: 2px solid #000;">
+            </div>
+            <div class="gantt-dependency-arrow"
+                 style="position: absolute; left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #000;">
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+    </div>
   </div>
-</div>
+{% else %}
+  <p class="text-muted">タスクがありません。</p>
+{% endif %}
 {% endblock %}
