@@ -6,7 +6,7 @@
 {% if current_user.role != 'Viewer' %}
 <div class="mb-4 p-3 border rounded bg-light">
   <h5>新規タスク追加</h5>
-  <form method="POST" class="row g-3">
+  <form method="POST" action="{{ url_for('tasks') }}" class="row g-3">
     <div class="col-md-6">
       <label class="form-label">タスク名</label>
       <input type="text" name="name" class="form-control" required>
