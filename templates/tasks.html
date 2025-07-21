@@ -19,6 +19,10 @@
       <label class="form-label">終了日</label>
       <input type="date" name="end_date" class="form-control" required>
     </div>
+    <div class="col-md-3">
+      <label class="form-label">リリースバージョン</label>
+      <input type="text" name="release_version" class="form-control">
+    </div>
     <div class="col-12">
       <label class="form-label">備考</label>
       <textarea name="remarks" class="form-control" rows="2"></textarea>
@@ -69,7 +73,7 @@
 <table class="table table-sm table-hover align-middle">
   <thead class="table-light">
     <tr>
-      <th>No</th><th>タスク名</th><th>開始日</th><th>終了日</th>
+      <th>No</th><th>タスク名</th><th>開始日</th><th>終了日</th><th>リリース</th>
       <th>担当者</th><th>進捗</th><th>先行タスク</th><th>備考</th><th>操作</th>
     </tr>
   </thead>
@@ -83,6 +87,7 @@
       </td>
       <td>{{ t.start_date }}</td>
       <td>{{ t.end_date }}</td>
+      <td>{{ t.release_version or '' }}</td>
       <td>{{ t.assignee.name if t.assignee else '' }}</td>
       <td>{{ t.progress }}%</td>
       <td>

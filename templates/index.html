@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>📊 ダッシュボード: プロジェクト概要</h2>
+<form method="get" class="mb-3">
+  <div class="input-group" style="max-width:300px;">
+    <select name="release" class="form-select" onchange="this.form.submit()">
+      <option value="">全てのリリース</option>
+      {% for r in releases %}
+      <option value="{{ r }}" {% if selected_release == r %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+    {% if selected_release %}
+      <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">解除</a>
+    {% endif %}
+  </div>
+</form>
 <div class="row text-center my-4">
   <div class="col-md-3">
     <div class="card border-primary mb-3">
