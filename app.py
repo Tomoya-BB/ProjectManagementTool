@@ -316,7 +316,7 @@ def index():
 
 
 @app.route('/tasks', methods=['GET', 'POST'])
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 @login_required
 def tasks():
     project = session.get('project')
