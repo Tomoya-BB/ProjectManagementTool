@@ -43,6 +43,7 @@ class Task(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     remarks = db.Column(db.Text, nullable=True)
+    release_version = db.Column(db.String(100))
     progress = db.Column(db.Integer, nullable=False, default=0)
     parent_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)
     assignee_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)

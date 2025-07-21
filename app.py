@@ -90,6 +90,9 @@ def init_db(project_name, db_path=None):
         if 'assignee_id' not in cols:
             with engine.begin() as conn:
                 conn.execute(text('ALTER TABLE tasks ADD COLUMN assignee_id INTEGER'))
+        if 'release_version' not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN release_version VARCHAR"))
 
         user_engine = db.get_engine(bind_key='users')
         with user_engine.connect() as conn:
@@ -333,11 +336,13 @@ def tasks():
             flash('End date cannot be before start date.', 'danger')
             return redirect(url_for('tasks'))
         remarks = request.form.get('remarks', '')
+        release_version = request.form.get('release_version')
         assignee_id = request.form.get('assignee_id', type=int)
         progress = int(request.form.get('progress', 0))
         parent_id = request.form.get('parent_id', type=int)
         task = Task(name=name, start_date=start, end_date=end,
-                    remarks=remarks, progress=progress,
+                    remarks=remarks, release_version=release_version,
+                    progress=progress,
                     assignee_id=assignee_id, parent_id=parent_id)
         db.session.add(task)
         db.session.commit()
@@ -380,6 +385,7 @@ def add_task():
             flash('End date cannot be before start date.', 'danger')
             return redirect(url_for('add_task'))
         progress = int(request.form.get('progress') or 0)
+        release_version = request.form.get('release_version')
         assignee_id = request.form.get('assignee_id') or None
         depends_on_id = request.form.get('depends_on_id') or None
         is_milestone = 'is_milestone' in request.form
@@ -389,6 +395,7 @@ def add_task():
             name=name,
             start_date=start_date,
             end_date=end_date,
+            release_version=release_version,
             progress=progress,
             assignee_id=assignee_id,
             depends_on_id=depends_on_id,
@@ -414,6 +421,7 @@ def edit_task(task_id):
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         task.remarks = request.form.get('remarks', '')
+        task.release_version = request.form.get('release_version')
         task.progress = int(request.form.get('progress', task.progress))
         task.assignee_id = request.form.get('assignee_id', type=int)
         task.parent_id = request.form.get('parent_id', type=int)
@@ -463,6 +471,7 @@ def update_task():
     task.start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
     task.end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d').date()
     task.remarks = data.get('remarks', task.remarks)
+    task.release_version = data.get('release_version', task.release_version)
     task.progress = int(data.get('progress', task.progress))
     task.assignee_id = data.get('assignee_id') or None
     task.parent_id = data.get('parent_id') or None
@@ -484,7 +493,12 @@ def update_task():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    tasks = Task.query.all()
+    release = request.args.get('release')
+    query = Task.query
+    if release:
+        query = query.filter(Task.release_version == release)
+    tasks = query.all()
+    releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     total_tasks = len(tasks)
     completed_tasks = sum(1 for t in tasks if t.progress == 100)
     overdue_tasks = sum(1 for t in tasks if t.progress < 100 and t.end_date < date.today())
@@ -505,8 +519,52 @@ def dashboard():
         "completed_tasks": completed_tasks,
         "overdue_tasks": overdue_tasks,
         "progress_rate": progress_rate,
-        "remaining_by_date": remaining_by_date
+        "remaining_by_date": remaining_by_date,
+        "releases": releases,
+        "selected_release": release
     })
+
+
+@app.route('/gantt')
+@login_required
+def gantt_chart():
+    release = request.args.get('release')
+    query = Task.query
+    if release:
+        query = query.filter(Task.release_version == release)
+    tasks = query.all()
+    releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
+    if tasks:
+        import pandas as pd
+        import plotly.express as px
+        df = pd.DataFrame([
+            {
+                "Task": t.name,
+                "Start": t.start_date,
+                "Finish": t.end_date,
+                "Progress": t.progress,
+            }
+            for t in tasks
+        ])
+        fig = px.timeline(
+            df,
+            x_start="Start",
+            x_end="Finish",
+            y="Task",
+            color="Progress",
+            color_continuous_scale=["#dc3545", "#ffc107", "#28a745"],
+            range_color=[0, 100],
+        )
+        fig.update_yaxes(autorange="reversed")
+        gantt = fig.to_html(full_html=False, include_plotlyjs=False)
+    else:
+        gantt = None
+    return render_template(
+        "gantt.html",
+        gantt=gantt,
+        releases=releases,
+        selected_release=release,
+    )
 
 
 if __name__ == '__main__':

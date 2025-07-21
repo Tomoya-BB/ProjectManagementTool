@@ -15,6 +15,10 @@
         <input type="date" name="end_date" value="{{ task.end_date if task else '' }}" class="form-control" required>
     </div>
     <div class="mb-3">
+        <label class="form-label">Release Version</label>
+        <input type="text" name="release_version" value="{{ task.release_version if task else '' }}" class="form-control">
+    </div>
+    <div class="mb-3">
         <label class="form-label">Assignee</label>
         <select name="assignee_id" class="form-select">
             <option value="">-- None --</option>
