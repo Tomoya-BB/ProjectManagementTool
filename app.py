@@ -358,8 +358,26 @@ def tasks():
         flash(f"New task '{name}' added.", 'success')
         return redirect(url_for('tasks'))
 
-    tasks = Task.query.order_by(Task.start_date).all()
+    release = request.args.get('release')
+    assignee = request.args.get('assignee', type=int)
+    sort_by = request.args.get('sort', 'start_date')
+
+    query = Task.query
+    if release:
+        query = query.filter(Task.release_version == release)
+    if assignee:
+        query = query.filter(Task.assignee_id == assignee)
+
+    if sort_by == 'release':
+        query = query.order_by(Task.release_version, Task.start_date)
+    elif sort_by == 'assignee':
+        query = query.join(Member).order_by(Member.name, Task.start_date)
+    else:
+        query = query.order_by(Task.start_date)
+
+    tasks = query.all()
     members = Member.query.all()
+    releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     deps = TaskDependency.query.all()
     current_date = date.today()
     day = timedelta(days=1)
@@ -367,6 +385,10 @@ def tasks():
         'tasks.html',
         tasks=tasks,
         members=members,
+        releases=releases,
+        selected_release=release,
+        selected_assignee=assignee,
+        sort_by=sort_by,
         deps=deps,
         current_date=current_date,
         day=day,
