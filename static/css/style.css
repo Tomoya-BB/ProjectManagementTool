@@ -12,3 +12,38 @@
 .bar-complete { background-color: #28a745; }
 .bar-ongoing { background-color: #0d6efd; }
 .bar-delayed { background-color: #dc3545; }
+
+/* Sliding task panel */
+#taskListContainer.panel-open {
+    margin-right: 420px;
+    transition: margin-right 0.3s ease;
+}
+
+.task-panel {
+    position: fixed;
+    top: 0;
+    right: -420px;
+    width: 420px;
+    max-width: 100%;
+    height: 100%;
+    background: #f8f9fa;
+    overflow-y: auto;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+    transition: right 0.3s ease;
+    padding: 1rem;
+    z-index: 1050;
+}
+
+.task-panel.open {
+    right: 0;
+}
+
+@media (max-width: 768px) {
+    #taskListContainer.panel-open {
+        margin-right: 0;
+    }
+    .task-panel {
+        width: 100%;
+        right: -100%;
+    }
+}
