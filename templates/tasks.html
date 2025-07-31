@@ -29,11 +29,13 @@
   </div>
 </form>
 
-<div class="row">
-  <div class="col-lg-8">
+<div id="taskListContainer">
+  {% if current_user.role != 'Viewer' %}
+  <button id="openNewTask" class="btn btn-secondary mb-3" data-action="{{ url_for('tasks') }}">新規タスク追加</button>
+  {% endif %}
 
-    <!-- タスク一覧テーブル -->
-    <table class="table table-sm table-hover align-middle">
+  <!-- タスク一覧テーブル -->
+  <table class="table table-sm table-hover align-middle">
       <thead class="table-light">
         <tr>
           <th>No</th><th>タスク名</th><th>開始日</th><th>終了日</th><th>リリース</th>
@@ -63,7 +65,18 @@
       <td>{{ t.remarks }}</td>
       <td>
         {% if current_user.role != 'Viewer' %}
-          <a href="{{ url_for('edit_task', task_id=t.id) }}" class="btn btn-sm btn-secondary">編集</a>
+          <button type="button" class="btn btn-sm btn-secondary edit-task-btn"
+            data-id="{{ t.id }}"
+            data-name="{{ t.name }}"
+            data-start="{{ t.start_date }}"
+            data-end="{{ t.end_date }}"
+            data-release="{{ t.release_version or '' }}"
+            data-remarks="{{ t.remarks or '' }}"
+            data-progress="{{ t.progress }}"
+            data-assignee="{{ t.assignee_id or '' }}"
+            data-parent="{{ t.parent_id or '' }}"
+            data-predecessors="{% for dep in deps if dep.successor_id == t.id %}{{ dep.predecessor_id }}{% if not loop.last %},{% endif %}{% endfor %}"
+            data-url="{{ url_for('edit_task', task_id=t.id) }}">編集</button>
           <form action="{{ url_for('delete_task', task_id=t.id) }}" method="POST" class="d-inline">
             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('削除しますか?');">削除</button>
           </form>
@@ -116,76 +129,72 @@
 {% else %}
   <p class="text-muted">タスクがありません。</p>
 {% endif %}
-  </div>
+</div>
 
-  <div class="col-lg-4">
-    {% if current_user.role != 'Viewer' %}
-    <button class="btn btn-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#newTaskForm" aria-expanded="true" aria-controls="newTaskForm">新規タスク追加フォーム</button>
-    <div id="newTaskForm" class="collapse show">
-      <div class="p-3 border rounded bg-light">
-        <form method="POST" action="{{ url_for('tasks') }}" class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">タスク名</label>
-            <input type="text" name="name" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">開始日</label>
-            <input type="date" name="start_date" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">終了日</label>
-            <input type="date" name="end_date" class="form-control" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">リリースバージョン</label>
-            <input type="text" name="release_version" class="form-control">
-          </div>
-          <div class="col-12">
-            <label class="form-label">備考</label>
-            <textarea name="remarks" class="form-control" rows="2"></textarea>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">担当者</label>
-            <select name="assignee_id" class="form-select">
-              <option value="">-- 未設定 --</option>
-              {% for m in members %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">先行タスク (依存関係)</label>
-            <select name="predecessors" multiple class="form-select">
-              {% for t in tasks %}
-              <option value="{{ t.id }}">{{ t.name }}</option>
-              {% endfor %}
-            </select>
-            <small class="text-muted">※この新タスクが開始する前に完了すべきタスクを選択（複数可）</small>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">親タスク (フェーズ)</label>
-            <select name="parent_id" class="form-select">
-              <option value="">-- なし --</option>
-              {% for t in tasks if not t.parent_id %}
-              <option value="{{ t.id }}">{{ t.name }}</option>
-              {% endfor %}
-            </select>
-            <small class="text-muted">※このタスクを含むフェーズや親タスクがあれば選択</small>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">進捗率</label>
-            <div class="input-group">
-              <input type="number" name="progress" class="form-control" value="0" min="0" max="100">
-              <span class="input-group-text">%</span>
-            </div>
-          </div>
-          <div class="col-12">
-            <button type="submit" class="btn btn-primary">追加</button>
-          </div>
-        </form>
+{% if current_user.role != 'Viewer' %}
+<div id="taskFormPanel" class="task-panel">
+  <button type="button" class="btn-close float-end" id="closeTaskForm"></button>
+  <h4 id="taskFormTitle" class="mb-3">新規タスク追加</h4>
+  <form method="POST" action="{{ url_for('tasks') }}" class="row g-3" id="taskForm">
+    <div class="col-md-6">
+      <label class="form-label">タスク名</label>
+      <input type="text" name="name" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">開始日</label>
+      <input type="date" name="start_date" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">終了日</label>
+      <input type="date" name="end_date" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">リリースバージョン</label>
+      <input type="text" name="release_version" class="form-control">
+    </div>
+    <div class="col-12">
+      <label class="form-label">備考</label>
+      <textarea name="remarks" class="form-control" rows="2"></textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">担当者</label>
+      <select name="assignee_id" class="form-select">
+        <option value="">-- 未設定 --</option>
+        {% for m in members %}
+        <option value="{{ m.id }}">{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">先行タスク (依存関係)</label>
+      <select name="predecessors" multiple class="form-select">
+        {% for t in tasks %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">※この新タスクが開始する前に完了すべきタスクを選択（複数可）</small>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">親タスク (フェーズ)</label>
+      <select name="parent_id" class="form-select">
+        <option value="">-- なし --</option>
+        {% for t in tasks if not t.parent_id %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">※このタスクを含むフェーズや親タスクがあれば選択</small>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">進捗率</label>
+      <div class="input-group">
+        <input type="number" name="progress" class="form-control" value="0" min="0" max="100">
+        <span class="input-group-text">%</span>
       </div>
     </div>
-    {% endif %}
-  </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary" id="taskFormSubmit">追加</button>
+    </div>
+  </form>
 </div>
+{% endif %}
 {% endblock %}

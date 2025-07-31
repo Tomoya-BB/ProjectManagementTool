@@ -105,4 +105,59 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  const panel = document.getElementById('taskFormPanel');
+  const listContainer = document.getElementById('taskListContainer');
+  const openBtn = document.getElementById('openNewTask');
+  const closeBtn = document.getElementById('closeTaskForm');
+  if (panel && listContainer && openBtn && closeBtn) {
+    const form = document.getElementById('taskForm');
+    const title = document.getElementById('taskFormTitle');
+    const submitBtn = document.getElementById('taskFormSubmit');
+
+    function openPanel() {
+      panel.classList.add('open');
+      listContainer.classList.add('panel-open');
+    }
+
+    function closePanel() {
+      panel.classList.remove('open');
+      listContainer.classList.remove('panel-open');
+    }
+
+    openBtn.addEventListener('click', () => {
+      form.reset();
+      form.action = openBtn.dataset.action;
+      title.textContent = '新規タスク追加';
+      submitBtn.textContent = '追加';
+      openPanel();
+    });
+
+    closeBtn.addEventListener('click', closePanel);
+
+    document.querySelectorAll('.edit-task-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        form.action = btn.dataset.url;
+        title.textContent = 'タスク編集';
+        submitBtn.textContent = '更新';
+        form.querySelector('input[name="name"]').value = btn.dataset.name;
+        form.querySelector('input[name="start_date"]').value = btn.dataset.start;
+        form.querySelector('input[name="end_date"]').value = btn.dataset.end;
+        form.querySelector('input[name="release_version"]').value = btn.dataset.release;
+        form.querySelector('textarea[name="remarks"]').value = btn.dataset.remarks;
+        form.querySelector('select[name="assignee_id"]').value = btn.dataset.assignee || '';
+        form.querySelector('select[name="parent_id"]').value = btn.dataset.parent || '';
+        const predsSelect = form.querySelector('select[name="predecessors"]');
+        [...predsSelect.options].forEach(o => { o.selected = false; });
+        if (btn.dataset.predecessors) {
+          btn.dataset.predecessors.split(',').forEach(id => {
+            const opt = predsSelect.querySelector(`option[value="${id}"]`);
+            if (opt) opt.selected = true;
+          });
+        }
+        form.querySelector('input[name="progress"]').value = btn.dataset.progress;
+        openPanel();
+      });
+    });
+  }
 });
