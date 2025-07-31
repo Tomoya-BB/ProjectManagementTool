@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text
 
 from models import db, Task, User, Project, Resource, Member, TaskDependency
+from api import api_bp
 
 app = Flask(__name__)
 app.secret_key = 'dev'
@@ -19,6 +20,41 @@ current_project_path = None
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+app.register_blueprint(api_bp, url_prefix='/api')
+
+def compute_gantt(tasks):
+    import pandas as pd
+    import plotly.express as px
+
+    records = []
+    for t in tasks:
+        records.append({
+            'id': t.id,
+            'Task': t.name,
+            'Start': t.start_date,
+            'Finish': t.end_date,
+            'Progress': t.progress,
+            'resource_name': t.assignee.name if t.assignee else '',
+            'release_revision': t.release_version,
+        })
+    df = pd.DataFrame(records)
+    if df.empty:
+        return None
+    df['label'] = df['resource_name'] + ' (' + df['release_revision'].fillna('') + ')'
+    fig = px.timeline(
+        df,
+        x_start='Start',
+        x_end='Finish',
+        y='Task',
+        color='Progress',
+        text='label',
+        color_continuous_scale=['#dc3545', '#ffc107', '#28a745'],
+        range_color=[0, 100],
+    )
+    fig.update_traces(textposition='inside', insidetextanchor='middle')
+    fig.update_traces(customdata=df[['id']])
+    fig.update_yaxes(autorange='reversed')
+    return fig.to_html(full_html=False, include_plotlyjs=False)
 
 
 @app.route('/setup', methods=['GET', 'POST'])
@@ -535,7 +571,7 @@ def dashboard():
             remaining = sum(1 for t in tasks if t.progress < 100 and t.end_date >= cur_date)
             remaining_by_date.append({"date": cur_date.strftime("%Y-%m-%d"), "remaining": remaining})
             cur_date += timedelta(days=1)
-
+    gantt = compute_gantt(tasks) if tasks else None
     return render_template('index.html', **{
         "total_tasks": total_tasks,
         "completed_tasks": completed_tasks,
@@ -543,7 +579,8 @@ def dashboard():
         "progress_rate": progress_rate,
         "remaining_by_date": remaining_by_date,
         "releases": releases,
-        "selected_release": release
+        "selected_release": release,
+        "gantt": gantt
     })
 
 
@@ -556,31 +593,7 @@ def gantt_chart():
         query = query.filter(Task.release_version == release)
     tasks = query.all()
     releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
-    if tasks:
-        import pandas as pd
-        import plotly.express as px
-        df = pd.DataFrame([
-            {
-                "Task": t.name,
-                "Start": t.start_date,
-                "Finish": t.end_date,
-                "Progress": t.progress,
-            }
-            for t in tasks
-        ])
-        fig = px.timeline(
-            df,
-            x_start="Start",
-            x_end="Finish",
-            y="Task",
-            color="Progress",
-            color_continuous_scale=["#dc3545", "#ffc107", "#28a745"],
-            range_color=[0, 100],
-        )
-        fig.update_yaxes(autorange="reversed")
-        gantt = fig.to_html(full_html=False, include_plotlyjs=False)
-    else:
-        gantt = None
+    gantt = compute_gantt(tasks) if tasks else None
     return render_template(
         "gantt.html",
         gantt=gantt,
