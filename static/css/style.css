@@ -3,15 +3,32 @@
     overflow-x: auto;
 }
 .gantt-bar {
+    position: relative;
     height: 1.2rem;
-    color: #fff;
+    color: #000;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 2px;
     padding: 0 4px;
     font-size: 0.75rem;
     white-space: nowrap;
+    overflow: hidden;
+    z-index: 0;
 }
-.bar-complete { background-color: #28a745; }
-.bar-ongoing { background-color: #0d6efd; }
-.bar-delayed { background-color: #dc3545; }
+.gantt-bar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--progress, 0%);
+    background-color: var(--bar-color, #0d6efd);
+    border-radius: 1px;
+    z-index: -1;
+}
+.bar-complete { --bar-color: #28a745; }
+.bar-ongoing { --bar-color: #0d6efd; }
+.bar-delayed { --bar-color: #dc3545; }
 
 /* Sliding task panel */
 #taskListContainer.panel-open {
