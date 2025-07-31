@@ -6,7 +6,7 @@ from functools import wraps
 from flask import Flask, render_template, redirect, url_for, request, session, abort, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 from models import db, Task, User, Project, Resource, Member, TaskDependency
 from api import api_bp
@@ -400,7 +400,7 @@ def tasks():
 
     query = Task.query
     if release:
-        query = query.filter(Task.release_version == release)
+        query = query.filter(func.lower(func.trim(Task.release_version)) == release.strip().lower())
     if assignee:
         query = query.filter(Task.assignee_id == assignee)
 
@@ -554,7 +554,7 @@ def dashboard():
     release = request.args.get('release')
     query = Task.query
     if release:
-        query = query.filter(Task.release_version == release)
+        query = query.filter(func.lower(func.trim(Task.release_version)) == release.strip().lower())
     tasks = query.all()
     releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     total_tasks = len(tasks)
@@ -590,7 +590,7 @@ def gantt_chart():
     release = request.args.get('release')
     query = Task.query
     if release:
-        query = query.filter(Task.release_version == release)
+        query = query.filter(func.lower(func.trim(Task.release_version)) == release.strip().lower())
     tasks = query.all()
     releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     gantt = compute_gantt(tasks) if tasks else None

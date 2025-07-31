@@ -108,7 +108,7 @@
         {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
         {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
         <div class="gantt-bar {{ status_class }}"
-             style="position: absolute; left: {{ offset }}px; width: {{ duration }}px;"
+             style="position: absolute; left: {{ offset }}px; width: {{ duration }}px; --progress: {{ t.progress }}%;"
              title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
           {{ t.name }}
         </div>
