@@ -1,12 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>🔁 プロジェクトを開く</h2>
-<form method="POST" enctype="multipart/form-data" class="mb-3">
-  <div class="mb-3">
-    <label class="form-label">プロジェクトファイル (project.json) を選択</label>
-    <input type="file" name="project_file" class="form-control" accept=".json" required>
+<section class="workspace-hero">
+  <div>
+    <p class="eyebrow">Open</p>
+    <h1 class="workspace-title">プロジェクトを開く</h1>
+    <p class="workspace-copy">既存の project.json を読み込んで、対応するデータベースを開きます。</p>
   </div>
-  <button type="submit" class="btn btn-info">開く</button>
-</form>
-<p class="text-muted">選択したプロジェクトフォルダ内の <code>db.sqlite3</code> を読み込みます。</p>
+</section>
+
+<section class="surface-panel auth-panel">
+  <form method="POST" enctype="multipart/form-data" class="row g-3">
+    <div class="col-12">
+      <label class="form-label">プロジェクトファイル</label>
+      <input type="file" name="project_file" class="form-control" accept=".json" required>
+      <small class="form-hint">選択したプロジェクトフォルダ内の <code>db.sqlite3</code> を読み込みます。</small>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">開く</button>
+    </div>
+  </form>
+</section>
 {% endblock %}

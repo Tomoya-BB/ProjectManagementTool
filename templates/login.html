@@ -1,15 +1,31 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="mb-4">Login</h1>
-<form method="post">
-    <div class="mb-3">
+<section class="auth-shell">
+  <div class="auth-copy">
+    <p class="eyebrow">Welcome back</p>
+    <h1 class="workspace-title">プロジェクト管理を、迷わず再開。</h1>
+    <p class="workspace-copy">進捗、担当、スケジュールを一つのワークスペースで管理できます。</p>
+  </div>
+  <div class="surface-panel auth-panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Sign in</p>
+        <h2>ログイン</h2>
+      </div>
+    </div>
+    <form method="post" class="row g-3">
+      <div class="col-12">
         <label class="form-label">Username</label>
         <input type="text" name="username" class="form-control" required>
-    </div>
-    <div class="mb-3">
+      </div>
+      <div class="col-12">
         <label class="form-label">Password</label>
         <input type="password" name="password" class="form-control" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Login</button>
-</form>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary w-100">Login</button>
+      </div>
+    </form>
+  </div>
+</section>
 {% endblock %}

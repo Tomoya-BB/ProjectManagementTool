@@ -1,162 +1,275 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>📋 タスク一覧</h2>
+{% set completed_tasks = tasks | selectattr('progress', 'equalto', 100) | list | length %}
+{% set overdue_tasks = tasks | selectattr('end_date', 'lt', current_date) | rejectattr('progress', 'equalto', 100) | list | length %}
+{% set unassigned_tasks = tasks | rejectattr('assignee') | list | length %}
 
-<!-- フィルター・ソート -->
-<form method="get" class="row g-2 mb-3">
-  <div class="col-auto">
-    <select name="release" class="form-select" onchange="this.form.submit()">
-      <option value="">全リリース</option>
-      {% for r in releases %}
-      <option value="{{ r }}" {% if selected_release == r %}selected{% endif %}>{{ r }}</option>
-      {% endfor %}
-    </select>
+<section class="workspace-hero">
+  <div>
+    <p class="eyebrow">Workspace</p>
+    <h1 class="workspace-title">タスク</h1>
+    <p class="workspace-copy">フィルター、進捗、依存関係、期限超過を確認できます。</p>
   </div>
-  <div class="col-auto">
-    <select name="assignee" class="form-select" onchange="this.form.submit()">
-      <option value="">全担当者</option>
-      {% for m in members %}
-      <option value="{{ m.id }}" {% if selected_assignee == m.id %}selected{% endif %}>{{ m.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-auto">
-    <select name="sort" class="form-select" onchange="this.form.submit()">
-      <option value="start_date" {% if sort_by == 'start_date' %}selected{% endif %}>開始日順</option>
-      <option value="release" {% if sort_by == 'release' %}selected{% endif %}>リリース順</option>
-      <option value="assignee" {% if sort_by == 'assignee' %}selected{% endif %}>担当者順</option>
-    </select>
-  </div>
-</form>
-
-<div id="taskListContainer">
   {% if current_user.role != 'Viewer' %}
-  <button id="openNewTask" class="btn btn-secondary mb-3" data-action="{{ url_for('tasks') }}">新規タスク追加</button>
+    <button id="openNewTask" class="btn btn-primary btn-lg" data-action="{{ url_for('tasks') }}">新規タスク追加</button>
   {% endif %}
+</section>
 
-  <!-- タスク一覧テーブル -->
-  <table class="table table-sm table-hover align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>No</th><th>タスク名</th><th>開始日</th><th>終了日</th><th>リリース</th>
-          <th>担当者</th><th>進捗</th><th>先行タスク</th><th>備考</th><th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-    {% for t in tasks %}
-    <tr class="{% if t.progress == 100 %}table-success{% elif t.end_date < current_date and t.progress < 100 %}table-danger{% endif %}">
-      <td>{{ loop.index }}</td>
-      <td>
-        {% if t.parent_id %} &emsp; 🔹 {% endif %}
-        {{ t.name }}
-      </td>
-      <td>{{ t.start_date }}</td>
-      <td>{{ t.end_date }}</td>
-      <td>{{ t.release_version or '' }}</td>
-      <td>{{ t.assignee.name if t.assignee else '' }}</td>
-      <td>{{ t.progress }}%</td>
-      <td>
-        {% set preds = [] %}
-        {% for dep in deps if dep.successor_id == t.id %}
-          {% set _ = preds.append(dep.predecessor.name) %}
-        {% endfor %}
-        {{ preds|join(', ') }}
-      </td>
-      <td>{{ t.remarks }}</td>
-      <td>
-        {% if current_user.role != 'Viewer' %}
-          <button type="button" class="btn btn-sm btn-secondary edit-task-btn"
-            data-id="{{ t.id }}"
-            data-name="{{ t.name }}"
-            data-start="{{ t.start_date }}"
-            data-end="{{ t.end_date }}"
-            data-release="{{ t.release_version or '' }}"
-            data-remarks="{{ t.remarks or '' }}"
-            data-progress="{{ t.progress }}"
-            data-assignee="{{ t.assignee_id or '' }}"
-            data-parent="{{ t.parent_id or '' }}"
-            data-predecessors="{% for dep in deps if dep.successor_id == t.id %}{{ dep.predecessor_id }}{% if not loop.last %},{% endif %}{% endfor %}"
-            data-url="{{ url_for('edit_task', task_id=t.id) }}">編集</button>
-          <form action="{{ url_for('delete_task', task_id=t.id) }}" method="POST" class="d-inline">
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('削除しますか?');">削除</button>
-          </form>
-        {% else %}
-          <small class="text-muted">閲覧のみ</small>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<section class="metric-strip metric-strip-compact">
+  <article class="metric-panel">
+    <span class="metric-label">表示中のタスク</span>
+    <strong class="metric-value">{{ tasks|length }}</strong>
+    <span class="metric-detail">フィルター後の件数</span>
+  </article>
+  <article class="metric-panel">
+    <span class="metric-label">完了</span>
+    <strong class="metric-value">{{ completed_tasks }}</strong>
+    <span class="metric-detail">完了率 {{ (completed_tasks / (tasks|length) * 100)|round(0, 'floor') if tasks else 0 }}%</span>
+  </article>
+  <article class="metric-panel metric-panel-alert">
+    <span class="metric-label">期限超過</span>
+    <strong class="metric-value">{{ overdue_tasks }}</strong>
+    <span class="metric-detail">優先的な確認対象</span>
+  </article>
+  <article class="metric-panel">
+    <span class="metric-label">未割り当て</span>
+    <strong class="metric-value">{{ unassigned_tasks }}</strong>
+    <span class="metric-detail">担当者未設定</span>
+  </article>
+</section>
 
-<!-- ガントチャート表示 -->
-{% if tasks %}
-  <h3 class="mt-5">ガントチャート</h3>
-  <div class="gantt-chart-container" style="overflow-x: auto; position: relative; padding: 1rem; border: 1px solid #ccc;">
-    <!-- 横軸（期間） -->
-    {% set project_start = tasks|map(attribute='start_date')|min %}
-    {% set project_end = tasks|map(attribute='end_date')|max %}
-    {% for d in range((project_end - project_start).days + 1) %}
-      {% set day_label = project_start + d*day %}
-      <div class="gantt-day-label" style="display:inline-block; width:20px;">
-        {{ day_label.day }}{% if day_label.day == 1 %}月{% endif %}
+<section id="taskListContainer">
+  <div class="surface-panel toolbar-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Filters</p>
+        <h2>一覧フィルター</h2>
       </div>
-    {% endfor %}
-    <div class="position-relative" style="margin-top: 1.5rem;">
-      {% for t in tasks %}
-        {% set offset = (t.start_date - project_start).days * 20 %}
-        {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
-        {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
-        <div class="gantt-bar {{ status_class }}"
-             style="position: absolute; left: {{ offset }}px; width: {{ duration }}px; --progress: {{ t.progress }}%;"
-             title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
-          {{ t.name }}
-        </div>
-        {% for dep in deps if dep.predecessor_id == t.id %}
-          {% set succ_task = tasks|selectattr('id', 'equalto', dep.successor_id)|first %}
-          {% if succ_task %}
-            <div class="gantt-dependency-line"
-                 style="position: absolute; left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px; border-bottom: 2px solid #000;">
-            </div>
-            <div class="gantt-dependency-arrow"
-                 style="position: absolute; left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #000;">
-            </div>
-          {% endif %}
+      <span class="section-note"><span id="taskVisibleCount">{{ tasks|length }}</span> 件表示中</span>
+    </div>
+    <form method="get" class="toolbar-row">
+      <div class="toolbar-group toolbar-group-wide">
+        <label class="toolbar-label" for="task-search">クイック検索</label>
+        <input id="task-search" type="search" class="form-control" placeholder="タスク名 / 担当者 / リリース / 備考">
+      </div>
+      <div class="toolbar-group">
+        <label class="toolbar-label" for="release-select">リリース</label>
+        <select id="release-select" name="release" class="form-select" onchange="this.form.submit()">
+          <option value="">全リリース</option>
+          {% for r in releases %}
+          <option value="{{ r }}" {% if selected_release == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label class="toolbar-label" for="assignee-select">担当者</label>
+        <select id="assignee-select" name="assignee" class="form-select" onchange="this.form.submit()">
+          <option value="">全担当者</option>
+          {% for m in members %}
+          <option value="{{ m.id }}" {% if selected_assignee == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="toolbar-group">
+        <label class="toolbar-label" for="sort-select">並び順</label>
+        <select id="sort-select" name="sort" class="form-select" onchange="this.form.submit()">
+          <option value="start_date" {% if sort_by == 'start_date' %}selected{% endif %}>開始日順</option>
+          <option value="release" {% if sort_by == 'release' %}selected{% endif %}>リリース順</option>
+          <option value="assignee" {% if sort_by == 'assignee' %}selected{% endif %}>担当者順</option>
+        </select>
+      </div>
+      <div class="toolbar-actions">
+        <a href="{{ url_for('tasks') }}" class="btn btn-outline-secondary">リセット</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="surface-panel table-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Task list</p>
+        <h2>タスク一覧</h2>
+      </div>
+      <span class="section-note">{{ tasks|length }} 件表示</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table task-table align-middle">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>タスク名</th>
+            <th>期間</th>
+            <th>リリース</th>
+            <th>担当者</th>
+            <th>進捗</th>
+            <th>先行タスク</th>
+            <th>備考</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+          {% set is_overdue = t.end_date < current_date and t.progress < 100 %}
+          {% set is_complete = t.progress == 100 %}
+          <tr data-task-row>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td>
+              <div class="task-name-cell">
+                <div class="task-title-row">
+                  {% if t.parent_id %}
+                    <span class="task-indent"></span>
+                  {% endif %}
+                  <strong>{{ t.name }}</strong>
+                </div>
+                <div class="task-status-row">
+                  {% if is_complete %}
+                    <span class="status-badge status-done">完了</span>
+                  {% elif is_overdue %}
+                    <span class="status-badge status-overdue">遅延</span>
+                  {% else %}
+                    <span class="status-badge status-active">進行中</span>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="date-range">
+                <span>{{ t.start_date }}</span>
+                <span class="date-separator">-</span>
+                <span>{{ t.end_date }}</span>
+              </div>
+            </td>
+            <td>{{ t.release_version or '-' }}</td>
+            <td>{{ t.assignee.name if t.assignee else '未設定' }}</td>
+            <td class="progress-cell">
+              <div class="progress-track">
+                <span class="progress-fill" style="width: {{ t.progress }}%"></span>
+              </div>
+              <span class="progress-label">{{ t.progress }}%</span>
+            </td>
+            <td>
+              {% set preds = [] %}
+              {% for dep in deps if dep.successor_id == t.id %}
+                {% set _ = preds.append(dep.predecessor.name) %}
+              {% endfor %}
+              <span class="dependency-text">{{ preds|join(', ') if preds else '-' }}</span>
+            </td>
+            <td class="remarks-cell">{{ t.remarks or '-' }}</td>
+            <td>
+              {% if current_user.role != 'Viewer' %}
+                <div class="action-group">
+                  <button type="button" class="btn btn-sm btn-outline-secondary edit-task-btn"
+                    data-id="{{ t.id }}"
+                    data-name="{{ t.name }}"
+                    data-start="{{ t.start_date }}"
+                    data-end="{{ t.end_date }}"
+                    data-release="{{ t.release_version or '' }}"
+                    data-remarks="{{ t.remarks or '' }}"
+                    data-progress="{{ t.progress }}"
+                    data-assignee="{{ t.assignee_id or '' }}"
+                    data-parent="{{ t.parent_id or '' }}"
+                    data-predecessors="{% for dep in deps if dep.successor_id == t.id %}{{ dep.predecessor_id }}{% if not loop.last %},{% endif %}{% endfor %}"
+                    data-url="{{ url_for('edit_task', task_id=t.id) }}">編集</button>
+                  <form action="{{ url_for('delete_task', task_id=t.id) }}" method="POST">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('削除しますか?');">削除</button>
+                  </form>
+                </div>
+              {% else %}
+                <small class="text-muted">閲覧のみ</small>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="taskSearchEmptyState" class="empty-state search-empty-state d-none">検索条件に一致するタスクはありません。</div>
+  </div>
+
+  {% if tasks %}
+  <div class="surface-panel timeline-panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Timeline</p>
+        <h2>簡易ガントビュー</h2>
+      </div>
+      <span class="section-note">日付軸に沿った進行状況</span>
+    </div>
+    <div class="gantt-chart-container">
+      {% set project_start = tasks|map(attribute='start_date')|min %}
+      {% set project_end = tasks|map(attribute='end_date')|max %}
+      <div class="gantt-day-header">
+        {% for d in range((project_end - project_start).days + 1) %}
+          {% set day_label = project_start + d*day %}
+          <div class="gantt-day-label">
+            {{ day_label.day }}{% if day_label.day == 1 %}月{% endif %}
+          </div>
         {% endfor %}
-      {% endfor %}
+      </div>
+      <div class="gantt-stage">
+        {% for t in tasks %}
+          {% set offset = (t.start_date - project_start).days * 20 %}
+          {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
+          {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
+          <div class="gantt-bar {{ status_class }}"
+               style="left: {{ offset }}px; width: {{ duration }}px; --progress: {{ t.progress }}%;"
+               title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
+            {{ t.name }}
+          </div>
+          {% for dep in deps if dep.predecessor_id == t.id %}
+            {% set succ_task = tasks|selectattr('id', 'equalto', dep.successor_id)|first %}
+            {% if succ_task %}
+              <div class="gantt-dependency-line"
+                   style="left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px;">
+              </div>
+              <div class="gantt-dependency-arrow"
+                   style="left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ loop.index0 * 1.5 }}rem;">
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
     </div>
   </div>
-{% else %}
-  <p class="text-muted">タスクがありません。</p>
-{% endif %}
-</div>
+  {% else %}
+  <div class="surface-panel">
+    <p class="empty-state">タスクがありません。新規タスクを追加すると一覧とタイムラインが表示されます。</p>
+  </div>
+  {% endif %}
+</section>
 
 {% if current_user.role != 'Viewer' %}
-<div id="taskFormPanel" class="task-panel">
-  <button type="button" class="btn-close float-end" id="closeTaskForm"></button>
-  <h4 id="taskFormTitle" class="mb-3">新規タスク追加</h4>
+<aside id="taskFormPanel" class="task-panel">
+  <div class="task-panel-header">
+    <div>
+      <p class="section-kicker">Editor</p>
+      <h3 id="taskFormTitle">新規タスク追加</h3>
+    </div>
+    <button type="button" class="btn-close" id="closeTaskForm"></button>
+  </div>
   <form method="POST" action="{{ url_for('tasks') }}" class="row g-3" id="taskForm">
-    <div class="col-md-6">
+    <div class="col-md-7">
       <label class="form-label">タスク名</label>
       <input type="text" name="name" class="form-control" required>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-5">
+      <label class="form-label">リリース</label>
+      <input type="text" name="release_version" class="form-control" placeholder="例: v1.2">
+    </div>
+    <div class="col-md-6">
       <label class="form-label">開始日</label>
       <input type="date" name="start_date" class="form-control" required>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-6">
       <label class="form-label">終了日</label>
       <input type="date" name="end_date" class="form-control" required>
     </div>
-    <div class="col-md-3">
-      <label class="form-label">リリースバージョン</label>
-      <input type="text" name="release_version" class="form-control">
-    </div>
     <div class="col-12">
       <label class="form-label">備考</label>
-      <textarea name="remarks" class="form-control" rows="2"></textarea>
+      <textarea name="remarks" class="form-control" rows="3" placeholder="補足や依存条件を記載"></textarea>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6">
       <label class="form-label">担当者</label>
       <select name="assignee_id" class="form-select">
         <option value="">-- 未設定 --</option>
@@ -165,24 +278,23 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-md-4">
-      <label class="form-label">先行タスク (依存関係)</label>
-      <select name="predecessors" multiple class="form-select">
-        {% for t in tasks %}
-        <option value="{{ t.id }}">{{ t.name }}</option>
-        {% endfor %}
-      </select>
-      <small class="text-muted">※この新タスクが開始する前に完了すべきタスクを選択（複数可）</small>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">親タスク (フェーズ)</label>
+    <div class="col-md-6">
+      <label class="form-label">親タスク</label>
       <select name="parent_id" class="form-select">
         <option value="">-- なし --</option>
         {% for t in tasks if not t.parent_id %}
         <option value="{{ t.id }}">{{ t.name }}</option>
         {% endfor %}
       </select>
-      <small class="text-muted">※このタスクを含むフェーズや親タスクがあれば選択</small>
+    </div>
+    <div class="col-md-8">
+      <label class="form-label">先行タスク</label>
+      <select name="predecessors" multiple class="form-select form-select-multi">
+        {% for t in tasks %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      <small class="form-hint">開始前に完了している必要があるタスクを選択します。</small>
     </div>
     <div class="col-md-4">
       <label class="form-label">進捗率</label>
@@ -191,10 +303,10 @@
         <span class="input-group-text">%</span>
       </div>
     </div>
-    <div class="col-12">
+    <div class="col-12 panel-actions">
       <button type="submit" class="btn btn-primary" id="taskFormSubmit">追加</button>
     </div>
   </form>
-</div>
+</aside>
 {% endif %}
 {% endblock %}

@@ -1,17 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>💾 新規プロジェクト作成</h2>
-<form method="POST" class="mb-3">
-  <div class="mb-3">
-    <label class="form-label">プロジェクト名</label>
-    <input type="text" name="project_name" class="form-control" required>
+<section class="workspace-hero">
+  <div>
+    <p class="eyebrow">Create</p>
+    <h1 class="workspace-title">新規プロジェクト</h1>
+    <p class="workspace-copy">保存先を指定して、作業用プロジェクトを作成します。</p>
   </div>
-  <div class="mb-3">
-    <label class="form-label">保存先フォルダパス</label>
-    <input type="text" name="save_path" class="form-control" placeholder="例: C:\projects または /home/user/projects" required>
-    <!-- ※GUIでのフォルダ選択はブラウザの制限上困難なため、手動でパスを入力 -->
-  </div>
-  <button type="submit" class="btn btn-primary">作成</button>
-</form>
-<p class="text-muted">指定フォルダに <code>「プロジェクト名」/project.json</code> および <code>db.sqlite3</code> を保存します。</p>
+</section>
+
+<section class="surface-panel auth-panel">
+  <form method="POST" class="row g-3">
+    <div class="col-12">
+      <label class="form-label">プロジェクト名</label>
+      <input type="text" name="project_name" class="form-control" required>
+    </div>
+    <div class="col-12">
+      <label class="form-label">保存先フォルダパス</label>
+      <input type="text" name="save_path" class="form-control" placeholder="例: /Users/name/projects" required>
+      <small class="form-hint">指定フォルダ内にプロジェクト用ファイルとデータベースを作成します。</small>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">作成</button>
+    </div>
+  </form>
+</section>
 {% endblock %}

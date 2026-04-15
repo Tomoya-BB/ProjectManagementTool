@@ -1,14 +1,17 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, abort
 from flask_restful import Api, Resource
 from datetime import datetime
+from flask_login import login_required, current_user
 from models import db, Task
 
 api_bp = Blueprint('api', __name__)
 api = Api(api_bp)
 
 class TaskResource(Resource):
+    method_decorators = [login_required]
+
     def get(self, id):
-        task = Task.query.get_or_404(id)
+        task = db.get_or_404(Task, id)
         return {
             'id': task.id,
             'name': task.name,
@@ -22,15 +25,21 @@ class TaskResource(Resource):
         }
 
 class UpdateTask(Resource):
+    method_decorators = [login_required]
+
     def post(self):
+        if current_user.role == 'Viewer':
+            abort(403)
         data = request.get_json() or {}
-        task = Task.query.get_or_404(data.get('id'))
+        task = db.get_or_404(Task, data.get('id'))
         if 'name' in data:
             task.name = data['name']
         if 'start_date' in data:
             task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         if 'end_date' in data:
             task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        if task.end_date < task.start_date:
+            return {'status': 'error', 'message': 'End date cannot be before start date.'}, 400
         if 'remarks' in data:
             task.remarks = data['remarks']
         if 'release_version' in data:
@@ -45,18 +54,28 @@ class UpdateTask(Resource):
         return {'status': 'ok'}
 
 class UpdateDates(Resource):
+    method_decorators = [login_required]
+
     def post(self):
+        if current_user.role == 'Viewer':
+            abort(403)
         data = request.get_json() or {}
-        task = Task.query.get_or_404(data.get('id'))
+        task = db.get_or_404(Task, data.get('id'))
         if 'start_date' in data:
             task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         if 'end_date' in data:
             task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        if task.end_date < task.start_date:
+            return {'status': 'error', 'message': 'End date cannot be before start date.'}, 400
         db.session.commit()
         return {'status': 'ok'}
 
 class BulkEdit(Resource):
+    method_decorators = [login_required]
+
     def post(self):
+        if current_user.role == 'Viewer':
+            abort(403)
         data = request.get_json() or {}
         ids = data.get('ids', [])
         updates = data.get('updates', {})

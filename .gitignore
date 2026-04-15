@@ -1,4 +1,7 @@
 __pycache__/
 instance/
 *.db
-
+node_modules/
+playwright-report/
+test-results/
+tests/.tmp/
