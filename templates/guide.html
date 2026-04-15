@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="guide-hero surface-panel">
+  <div class="guide-hero-copy">
+    <p class="eyebrow">Usage guide</p>
+    <h1 class="workspace-title">このアプリでできることを、最短ルートで把握。</h1>
+    <p class="workspace-copy">
+      プロジェクトの作成から、タスク登録、進捗確認、ガントチャートでの俯瞰まで、
+      日々の使い方を順番にまとめました。
+    </p>
+    <div class="guide-hero-actions">
+      {% if current_user.is_authenticated %}
+        {% if session.get('project') %}
+          <a href="{{ url_for('tasks') }}" class="btn btn-primary">タスク一覧へ</a>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">ダッシュボードを見る</a>
+        {% else %}
+          <a href="{{ url_for('select_project') }}" class="btn btn-primary">プロジェクトを選ぶ</a>
+          <a href="{{ url_for('open_project') }}" class="btn btn-outline-secondary">既存プロジェクトを開く</a>
+        {% endif %}
+      {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-primary">ログイン</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="guide-highlight">
+    <span class="guide-highlight-label">基本フロー</span>
+    <ol class="guide-highlight-list">
+      <li>プロジェクトを作成または読み込み</li>
+      <li>メンバーを登録</li>
+      <li>タスクを追加して担当・期限を設定</li>
+      <li>ダッシュボードとガントで進捗確認</li>
+    </ol>
+  </div>
+</section>
+
+<section class="guide-section">
+  <div class="section-heading">
+    <div>
+      <p class="section-kicker">Quick start</p>
+      <h2>まずはこの順番</h2>
+    </div>
+    <span class="section-note">はじめての人向けの最短セットアップ</span>
+  </div>
+  <div class="guide-steps">
+    <article class="guide-step">
+      <span class="guide-step-number">01</span>
+      <h3>プロジェクトを用意する</h3>
+      <p>新規作成では保存先フォルダに <code>project.json</code> と <code>db.sqlite3</code> を作成します。既存案件を続きから始めるときは <code>project.json</code> を読み込みます。</p>
+      <div class="guide-step-links">
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('new_project') }}">新規プロジェクト</a>
+          <a href="{{ url_for('open_project') }}">プロジェクトを開く</a>
+        {% else %}
+          <span>ログイン後に操作できます</span>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="guide-step">
+      <span class="guide-step-number">02</span>
+      <h3>メンバーを登録する</h3>
+      <p>担当者を先に登録しておくと、タスク作成時に割り当てがしやすくなります。役割ベースで進めるなら、開発、デザイン、確認担当などの名前で登録しても運用できます。</p>
+      <div class="guide-step-links">
+        {% if current_user.is_authenticated and current_user.role == 'Admin' %}
+          <a href="{{ url_for('members') }}">メンバー管理へ</a>
+        {% else %}
+          <span>メンバー管理は Admin が利用できます</span>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="guide-step">
+      <span class="guide-step-number">03</span>
+      <h3>タスクを追加する</h3>
+      <p>開始日、終了日、進捗、担当、リリース、親タスク、依存関係を設定できます。要点を <code>remarks</code> に残しておくと、引き継ぎ時も見通しが良くなります。</p>
+      <div class="guide-step-links">
+        {% if current_user.is_authenticated and session.get('project') %}
+          <a href="{{ url_for('tasks') }}">タスク一覧へ</a>
+        {% else %}
+          <span>プロジェクト選択後に利用できます</span>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="guide-step">
+      <span class="guide-step-number">04</span>
+      <h3>進捗を確認する</h3>
+      <p>ダッシュボードでは完了率、期限超過、残タスク推移をまとめて確認できます。スケジュールの重なりや担当の見え方はガントチャートで俯瞰するのがおすすめです。</p>
+      <div class="guide-step-links">
+        {% if current_user.is_authenticated and session.get('project') %}
+          <a href="{{ url_for('dashboard') }}">ダッシュボード</a>
+          <a href="{{ url_for('gantt_chart') }}">ガントチャート</a>
+        {% else %}
+          <span>プロジェクト選択後に利用できます</span>
+        {% endif %}
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="guide-section guide-grid">
+  <article class="surface-panel guide-panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Daily workflow</p>
+        <h2>日々の運用イメージ</h2>
+      </div>
+    </div>
+    <ul class="guide-list">
+      <li>朝にダッシュボードで期限超過と完了率を確認する</li>
+      <li>タスク一覧でリリースや担当者ごとに絞り込み、優先度を整理する</li>
+      <li>進捗が変わったタスクは編集して数値を更新する</li>
+      <li>依存関係や親タスクを設定して、抜け漏れを減らす</li>
+      <li>週次でガントチャートを見て全体の遅れや偏りを確認する</li>
+    </ul>
+  </article>
+
+  <article class="surface-panel guide-panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Roles</p>
+        <h2>ロールごとの使い分け</h2>
+      </div>
+    </div>
+    <div class="guide-roles">
+      <div class="guide-role">
+        <span class="guide-role-name">Admin</span>
+        <p>プロジェクト作成、メンバー管理、タスク編集を含む全体運用を担当します。</p>
+      </div>
+      <div class="guide-role">
+        <span class="guide-role-name">Editor</span>
+        <p>タスクの追加や更新を担当します。進捗更新の中心になるロールです。</p>
+      </div>
+      <div class="guide-role">
+        <span class="guide-role-name">Viewer</span>
+        <p>一覧、ダッシュボード、ガントチャートを閲覧して状況確認に使います。</p>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="guide-section">
+  <div class="section-heading">
+    <div>
+      <p class="section-kicker">Tips</p>
+      <h2>迷いにくくするコツ</h2>
+    </div>
+  </div>
+  <div class="guide-tips">
+    <article class="guide-tip">
+      <h3>リリース名は表記を統一する</h3>
+      <p>同じ意味のリリース名が複数表記になると、絞り込みが分散します。例: <code>v1.2</code> で統一。</p>
+    </article>
+    <article class="guide-tip">
+      <h3>完了条件を remarks に残す</h3>
+      <p>進捗率だけでは判断しにくいタスクは、確認内容や完了条件を一言添えると運用しやすくなります。</p>
+    </article>
+    <article class="guide-tip">
+      <h3>親タスクでまとまりを作る</h3>
+      <p>大きい作業を親タスクで束ねると、ガントチャートでも一覧でも流れを追いやすくなります。</p>
+    </article>
+  </div>
+</section>
+
+<section class="guide-section">
+  <div class="section-heading">
+    <div>
+      <p class="section-kicker">FAQ</p>
+      <h2>よくある確認ポイント</h2>
+    </div>
+  </div>
+  <div class="guide-faq">
+    <article class="guide-faq-item">
+      <h3>どのファイルを共有すれば同じプロジェクトを開けますか？</h3>
+      <p><code>project.json</code> と同じフォルダ内の <code>db.sqlite3</code> が必要です。使う側は「プロジェクトを開く」から <code>project.json</code> を選択します。</p>
+    </article>
+    <article class="guide-faq-item">
+      <h3>まず何を見れば全体状況が分かりますか？</h3>
+      <p>ダッシュボードを見ると、完了率、期限超過、残タスク推移を一度に確認できます。遅れや偏りのチェックはガントチャートが向いています。</p>
+    </article>
+    <article class="guide-faq-item">
+      <h3>閲覧専用で使いたい場合は？</h3>
+      <p><code>Viewer</code> ロールでログインすると、更新系の操作を抑えつつ状況確認に集中できます。</p>
+    </article>
+  </div>
+</section>
+{% endblock %}

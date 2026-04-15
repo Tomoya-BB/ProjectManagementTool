@@ -114,15 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('taskForm');
     const title = document.getElementById('taskFormTitle');
     const submitBtn = document.getElementById('taskFormSubmit');
+    const nameInput = form.querySelector('input[name="name"]');
 
     function openPanel() {
       panel.classList.add('open');
       listContainer.classList.add('panel-open');
+      document.body.classList.add('has-task-panel-open');
+      if (nameInput) {
+        window.setTimeout(() => nameInput.focus(), 120);
+      }
     }
 
     function closePanel() {
       panel.classList.remove('open');
       listContainer.classList.remove('panel-open');
+      document.body.classList.remove('has-task-panel-open');
     }
 
     openBtn.addEventListener('click', () => {
@@ -134,6 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     closeBtn.addEventListener('click', closePanel);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && panel.classList.contains('open')) {
+        closePanel();
+      }
+    });
 
     document.querySelectorAll('.edit-task-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -159,5 +170,33 @@ document.addEventListener('DOMContentLoaded', () => {
         openPanel();
       });
     });
+  }
+
+  const taskSearchInput = document.getElementById('task-search');
+  if (taskSearchInput) {
+    const rows = [...document.querySelectorAll('[data-task-row]')];
+    const visibleCount = document.getElementById('taskVisibleCount');
+    const emptyState = document.getElementById('taskSearchEmptyState');
+
+    const applyTaskSearch = () => {
+      const query = taskSearchInput.value.trim().toLowerCase();
+      let count = 0;
+
+      rows.forEach((row) => {
+        const matches = !query || row.textContent.toLowerCase().includes(query);
+        row.style.display = matches ? '' : 'none';
+        if (matches) count += 1;
+      });
+
+      if (visibleCount) {
+        visibleCount.textContent = count;
+      }
+      if (emptyState) {
+        emptyState.classList.toggle('d-none', count !== 0);
+      }
+    };
+
+    taskSearchInput.addEventListener('input', applyTaskSearch);
+    applyTaskSearch();
   }
 });

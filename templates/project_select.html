@@ -1,16 +1,27 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="mb-4">Select Project</h1>
-<form method="post">
-    <div class="mb-3">
-        <label class="form-label">Project Name</label>
-        <select name="project" class="form-select">
-        {% for project in projects %}
-            <option value="{{ project }}">{{ project }}</option>
-        {% endfor %}
-        </select>
+<section class="workspace-hero">
+  <div>
+    <p class="eyebrow">Project switcher</p>
+    <h1 class="workspace-title">作業するプロジェクトを選択</h1>
+    <p class="workspace-copy">既存プロジェクトを開くか、新しいプロジェクトを作成できます。</p>
+  </div>
+</section>
+
+<section class="surface-panel auth-panel">
+  <form method="post" class="row g-3">
+    <div class="col-12">
+      <label class="form-label">Project Name</label>
+      <select name="project" class="form-select">
+      {% for project in projects %}
+          <option value="{{ project }}">{{ project }}</option>
+      {% endfor %}
+      </select>
     </div>
-    <button type="submit" class="btn btn-primary">Open</button>
-</form>
-<a href="{{ url_for('create_project') }}" class="btn btn-secondary mt-3">New Project</a>
+    <div class="col-12 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Open</button>
+      <a href="{{ url_for('create_project') }}" class="btn btn-outline-secondary">New Project</a>
+    </div>
+  </form>
+</section>
 {% endblock %}

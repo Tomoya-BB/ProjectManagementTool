@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -7,6 +7,10 @@ from flask_login import UserMixin
 # 'db' is used for task databases (per project) and also binds to the user database
 
 db = SQLAlchemy()
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class User(UserMixin, db.Model):
     __bind_key__ = 'users'
@@ -61,7 +65,7 @@ class Task(db.Model):
     depends_on = db.relationship('Task', remote_side=[id],
                                 foreign_keys=[depends_on_id])
     is_milestone = db.Column(db.Boolean, default=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     def __repr__(self):
         return f'<Task {self.name}>'
