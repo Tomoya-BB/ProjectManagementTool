@@ -51,7 +51,7 @@ class ProjectManagementToolTestCase(unittest.TestCase):
             db.session.commit()
             return member.id
 
-    def create_task(self, name, assignee_id=None, release_version=None, progress=0):
+    def create_task(self, name, assignee_id=None, release_version=None, progress=0, parent_id=None):
         with self.app.app_context():
             task = Task(
                 name=name,
@@ -61,6 +61,7 @@ class ProjectManagementToolTestCase(unittest.TestCase):
                 release_version=release_version,
                 progress=progress,
                 assignee_id=assignee_id,
+                parent_id=parent_id,
             )
             db.session.add(task)
             db.session.commit()
@@ -288,6 +289,46 @@ class ProjectManagementToolTestCase(unittest.TestCase):
             html = app_module.compute_gantt([task])
 
         self.assertIn("Alice (v1.0)", html)
+        self.assertIn("rgba(20, 33, 61, 0.08)", html)
+
+    def test_tasks_page_groups_children_under_parent_in_manual_sort(self):
+        self.create_user("admin")
+        parent_id = self.create_task("Parent task")
+        self.create_task("Child task", parent_id=parent_id)
+
+        self.login_and_open_project()
+        response = self.client.get("/tasks?sort=manual")
+
+        self.assertEqual(response.status_code, 200)
+        parent_pos = response.data.find("Parent task".encode())
+        child_pos = response.data.find("Child task".encode())
+        self.assertNotEqual(parent_pos, -1)
+        self.assertNotEqual(child_pos, -1)
+        self.assertLess(parent_pos, child_pos)
+
+    def test_move_task_swaps_sibling_order(self):
+        self.create_user("admin")
+        first_id = self.create_task("First task")
+        second_id = self.create_task("Second task")
+
+        self.login_and_open_project()
+        response = self.client.post(
+            f"/task/{second_id}/move",
+            data={"direction": "up", "next": "/tasks?sort=manual"},
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        first_pos = response.data.find("First task".encode())
+        second_pos = response.data.find("Second task".encode())
+        self.assertNotEqual(first_pos, -1)
+        self.assertNotEqual(second_pos, -1)
+        self.assertLess(second_pos, first_pos)
+
+        with self.app.app_context():
+            first_task = db.session.get(Task, first_id)
+            second_task = db.session.get(Task, second_id)
+            self.assertLess(second_task.order_index, first_task.order_index)
 
 
 if __name__ == "__main__":

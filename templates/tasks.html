@@ -73,6 +73,7 @@
       <div class="toolbar-group">
         <label class="toolbar-label" for="sort-select">並び順</label>
         <select id="sort-select" name="sort" class="form-select" onchange="this.form.submit()">
+          <option value="manual" {% if sort_by == 'manual' %}selected{% endif %}>親子・手動順</option>
           <option value="start_date" {% if sort_by == 'start_date' %}selected{% endif %}>開始日順</option>
           <option value="release" {% if sort_by == 'release' %}selected{% endif %}>リリース順</option>
           <option value="assignee" {% if sort_by == 'assignee' %}selected{% endif %}>担当者順</option>
@@ -115,9 +116,9 @@
           <tr data-task-row>
             <td class="text-muted">{{ loop.index }}</td>
             <td>
-              <div class="task-name-cell">
+              <div class="task-name-cell" style="--task-depth: {{ t.display_depth|default(0) }};">
                 <div class="task-title-row">
-                  {% if t.parent_id %}
+                  {% if t.display_depth|default(0) > 0 %}
                     <span class="task-indent"></span>
                   {% endif %}
                   <strong>{{ t.name }}</strong>
@@ -129,6 +130,9 @@
                     <span class="status-badge status-overdue">遅延</span>
                   {% else %}
                     <span class="status-badge status-active">進行中</span>
+                  {% endif %}
+                  {% if t.parent %}
+                    <span class="task-parent-label">{{ t.parent.name }}</span>
                   {% endif %}
                 </div>
               </div>
@@ -159,6 +163,18 @@
             <td>
               {% if current_user.role != 'Viewer' %}
                 <div class="action-group">
+                  {% if sort_by == 'manual' %}
+                    <form action="{{ url_for('move_task', task_id=t.id) }}" method="POST" class="task-move-form">
+                      <input type="hidden" name="direction" value="up">
+                      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary" title="同じ親タスク内で上へ移動">↑</button>
+                    </form>
+                    <form action="{{ url_for('move_task', task_id=t.id) }}" method="POST" class="task-move-form">
+                      <input type="hidden" name="direction" value="down">
+                      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary" title="同じ親タスク内で下へ移動">↓</button>
+                    </form>
+                  {% endif %}
                   <button type="button" class="btn btn-sm btn-outline-secondary edit-task-btn"
                     data-id="{{ t.id }}"
                     data-name="{{ t.name }}"
@@ -207,24 +223,25 @@
           </div>
         {% endfor %}
       </div>
-      <div class="gantt-stage">
+      <div class="gantt-stage" style="min-height: {{ (tasks|length * 2.3) + 1.8 }}rem; width: {{ ((project_end - project_start).days + 1) * 20 }}px;">
         {% for t in tasks %}
+          {% set row_index = loop.index0 %}
           {% set offset = (t.start_date - project_start).days * 20 %}
           {% set duration = (t.end_date - t.start_date).days * 20 + 20 %}
           {% set status_class = 'bar-complete' if t.progress == 100 else 'bar-delayed' if (t.end_date < current_date and t.progress < 100) else 'bar-ongoing' %}
           <div class="gantt-bar {{ status_class }}"
-               style="left: {{ offset }}px; width: {{ duration }}px; --progress: {{ t.progress }}%;"
+               style="left: {{ offset }}px; top: {{ row_index * 2.3 }}rem; width: {{ duration }}px; --progress: {{ t.progress }}%;"
                title="{{ t.name }}: {{ t.progress }}%完了（{{ t.start_date }} - {{ t.end_date }}{% if t.assignee %}, 担当: {{ t.assignee.name }}{% endif %}）">
-            {{ t.name }}
+            {% if t.display_depth|default(0) > 0 %}{{ "└ " * (t.display_depth|default(0)) }}{% endif %}{{ t.name }}
           </div>
           {% for dep in deps if dep.predecessor_id == t.id %}
             {% set succ_task = tasks|selectattr('id', 'equalto', dep.successor_id)|first %}
             {% if succ_task %}
               <div class="gantt-dependency-line"
-                   style="left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ loop.index0 * 1.5 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px;">
+                   style="left: {{ (t.end_date - project_start).days * 20 + 20 }}px; top: {{ row_index * 2.3 + 0.7 }}rem; width: {{ ((succ_task.start_date - t.end_date).days) * 20 - 4 }}px;">
               </div>
               <div class="gantt-dependency-arrow"
-                   style="left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ loop.index0 * 1.5 }}rem;">
+                   style="left: {{ (succ_task.start_date - project_start).days * 20 }}px; top: {{ row_index * 2.3 + 0.42 }}rem;">
               </div>
             {% endif %}
           {% endfor %}
