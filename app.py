@@ -184,6 +184,149 @@ def compute_gantt(tasks):
     )
 
 
+def format_availability_date(target_date, reference_date):
+    if target_date == reference_date:
+        return '今日'
+    return target_date.strftime('%Y-%m-%d')
+
+
+def merge_task_ranges(tasks, reference_date):
+    intervals = []
+    for task in tasks:
+        if task.progress >= 100 or task.end_date < reference_date:
+            continue
+        intervals.append((max(task.start_date, reference_date), task.end_date))
+
+    intervals.sort(key=lambda item: (item[0], item[1]))
+    merged = []
+    for start_date, end_date in intervals:
+        if not merged or start_date > merged[-1][1] + timedelta(days=1):
+            merged.append([start_date, end_date])
+        else:
+            merged[-1][1] = max(merged[-1][1], end_date)
+    return merged
+
+
+def compute_member_availability(members, tasks, reference_date=None):
+    reference_date = reference_date or date.today()
+    tasks_by_member = {}
+    for task in tasks:
+        if task.assignee_id:
+            tasks_by_member.setdefault(task.assignee_id, []).append(task)
+
+    availability = []
+    for member in members:
+        member_tasks = sorted(
+            tasks_by_member.get(member.id, []),
+            key=lambda task: (task.start_date, task.end_date, task.name.lower()),
+        )
+        open_tasks = [
+            task for task in member_tasks
+            if task.progress < 100 and task.end_date >= reference_date
+        ]
+        active_tasks = [
+            task for task in open_tasks
+            if task.start_date <= reference_date <= task.end_date
+        ]
+        upcoming_tasks = [
+            task for task in open_tasks
+            if task.start_date > reference_date
+        ]
+        merged_ranges = merge_task_ranges(open_tasks, reference_date)
+
+        next_available_date = reference_date
+        if merged_ranges and merged_ranges[0][0] <= reference_date <= merged_ranges[0][1]:
+            block_end = merged_ranges[0][1]
+            for start_date, end_date in merged_ranges[1:]:
+                if start_date > block_end + timedelta(days=1):
+                    break
+                block_end = max(block_end, end_date)
+            next_available_date = block_end + timedelta(days=1)
+
+        scheduled_days = sum((end_date - start_date).days + 1 for start_date, end_date in merged_ranges)
+        next_task = upcoming_tasks[0] if upcoming_tasks else None
+        active_task_names = [task.name for task in active_tasks]
+
+        if len(active_tasks) > 1:
+            status_label = '重複中'
+            status_class = 'availability-badge-alert'
+        elif active_tasks:
+            status_label = '稼働中'
+            status_class = 'availability-badge-busy'
+        else:
+            status_label = '空き'
+            status_class = 'availability-badge-free'
+
+        availability.append({
+            'member': member,
+            'active_task_count': len(active_tasks),
+            'active_task_names': active_task_names,
+            'is_busy_today': bool(active_tasks),
+            'is_overbooked': len(active_tasks) > 1,
+            'status_label': status_label,
+            'status_class': status_class,
+            'open_task_count': len(open_tasks),
+            'scheduled_days': scheduled_days,
+            'next_available_label': format_availability_date(next_available_date, reference_date),
+            'next_task_name': next_task.name if next_task else None,
+            'next_task_start': next_task.start_date.strftime('%Y-%m-%d') if next_task else None,
+            'next_task_label': (
+                f"{next_task.start_date.strftime('%Y-%m-%d')} から"
+                if next_task else '予定なし'
+            ),
+        })
+
+    return availability
+
+
+def build_member_schedule_rows(members, tasks, start_date=None, days=14):
+    start_date = start_date or date.today()
+    schedule_days = [start_date + timedelta(days=offset) for offset in range(days)]
+    tasks_by_member = {}
+    for task in tasks:
+        if task.assignee_id and task.progress < 100 and task.end_date >= start_date:
+            tasks_by_member.setdefault(task.assignee_id, []).append(task)
+
+    schedule_rows = []
+    for member in members:
+        day_cells = []
+        member_tasks = tasks_by_member.get(member.id, [])
+        for target_day in schedule_days:
+            active_tasks = [
+                task for task in member_tasks
+                if task.start_date <= target_day <= task.end_date
+            ]
+            if len(active_tasks) > 1:
+                cell_class = 'schedule-cell-overbooked'
+                state_label = '重複'
+            elif active_tasks:
+                cell_class = 'schedule-cell-busy'
+                state_label = '稼働'
+            else:
+                cell_class = 'schedule-cell-free'
+                state_label = '空き'
+
+            day_cells.append({
+                'date': target_day,
+                'tasks': active_tasks,
+                'task_count': len(active_tasks),
+                'cell_class': cell_class,
+                'state_label': state_label,
+                'task_names': [task.name for task in active_tasks],
+                'summary_label': (
+                    f"{len(active_tasks)}件"
+                    if active_tasks else '空'
+                ),
+            })
+
+        schedule_rows.append({
+            'member': member,
+            'cells': day_cells,
+        })
+
+    return schedule_days, schedule_rows
+
+
 @app.route('/setup', methods=['GET', 'POST'])
 def setup():
     """Create the initial admin user if none exist."""
@@ -573,6 +716,7 @@ def tasks():
     assignee = request.args.get('assignee', type=int)
     sort_by = request.args.get('sort', 'manual')
 
+    all_project_tasks = Task.query.all()
     query = Task.query
     if release:
         query = query.filter(func.lower(func.trim(Task.release_version)) == release.strip().lower())
@@ -591,6 +735,13 @@ def tasks():
     if sort_by != 'manual':
         tasks = query.all()
     members = Member.query.all()
+    member_availability = compute_member_availability(members, all_project_tasks)
+    schedule_days, member_schedule_rows = build_member_schedule_rows(
+        members,
+        all_project_tasks,
+        start_date=date.today(),
+        days=14,
+    )
     releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     deps = TaskDependency.query.all()
     current_date = date.today()
@@ -603,6 +754,9 @@ def tasks():
         selected_release=release,
         selected_assignee=assignee,
         sort_by=sort_by,
+        member_availability=member_availability,
+        schedule_days=schedule_days,
+        member_schedule_rows=member_schedule_rows,
         deps=deps,
         current_date=current_date,
         day=day,

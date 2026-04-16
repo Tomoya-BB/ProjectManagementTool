@@ -38,6 +38,113 @@
   </article>
 </section>
 
+{% if member_availability %}
+<section class="surface-panel availability-panel">
+  <div class="section-heading">
+    <div>
+      <p class="section-kicker">Availability</p>
+      <h2>メンバー空き状況</h2>
+    </div>
+    <span class="section-note">{{ current_date }} 時点 / 全タスク基準</span>
+  </div>
+  <div class="availability-grid">
+    {% for slot in member_availability %}
+    <article class="availability-card {% if slot.is_overbooked %}availability-card-alert{% endif %}">
+      <div class="availability-card-head">
+        <div class="availability-person">
+          <span class="member-avatar">{{ slot.member.name[:1] }}</span>
+          <div>
+            <strong>{{ slot.member.name }}</strong>
+            <div class="member-meta">
+              {% if slot.is_busy_today %}
+                今日 {{ slot.active_task_count }} 件対応中
+              {% else %}
+                今日の空きあり
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <span class="availability-badge {{ slot.status_class }}">{{ slot.status_label }}</span>
+      </div>
+
+      <div class="availability-metrics">
+        <div class="availability-metric">
+          <span class="availability-metric-label">次に空く日</span>
+          <strong>{{ slot.next_available_label }}</strong>
+        </div>
+        <div class="availability-metric">
+          <span class="availability-metric-label">次の予定</span>
+          <strong>{{ slot.next_task_label }}</strong>
+        </div>
+        <div class="availability-metric">
+          <span class="availability-metric-label">未完了タスク</span>
+          <strong>{{ slot.open_task_count }} 件</strong>
+        </div>
+        <div class="availability-metric">
+          <span class="availability-metric-label">予定日数</span>
+          <strong>{{ slot.scheduled_days }} 日</strong>
+        </div>
+      </div>
+
+      {% if slot.active_task_names %}
+      <p class="availability-note">進行中: {{ slot.active_task_names|join(' / ') }}</p>
+      {% elif slot.next_task_name %}
+      <p class="availability-note">次回: {{ slot.next_task_name }} ({{ slot.next_task_start }})</p>
+      {% else %}
+      <p class="availability-note">未割り当てなので、すぐにアサインできます。</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if member_schedule_rows %}
+<section class="surface-panel schedule-panel">
+  <div class="section-heading">
+    <div>
+      <p class="section-kicker">Schedule</p>
+      <h2>メンバー予定表</h2>
+    </div>
+    <span class="section-note">{{ schedule_days[0] }} から {{ schedule_days[-1] }} まで</span>
+  </div>
+  <div class="schedule-table-wrap">
+    <table class="table schedule-table">
+      <thead>
+        <tr>
+          <th>メンバー</th>
+          {% for day_item in schedule_days %}
+          <th class="{% if day_item == current_date %}schedule-head-today{% endif %}">
+            <span>{{ day_item.strftime('%m/%d') }}</span>
+            <small>{{ day_item.strftime('%a') }}</small>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in member_schedule_rows %}
+        <tr>
+          <th scope="row">
+            <div class="schedule-member">
+              <span class="member-avatar">{{ row.member.name[:1] }}</span>
+              <strong>{{ row.member.name }}</strong>
+            </div>
+          </th>
+          {% for cell in row.cells %}
+          <td class="{{ cell.cell_class }} {% if cell.date == current_date %}schedule-cell-today{% endif %}"
+              title="{% if cell.task_names %}{{ cell.task_names|join(' / ') }}{% else %}予定なし{% endif %}">
+            <span class="schedule-cell-state">{{ cell.state_label }}</span>
+            <strong class="schedule-cell-summary">{{ cell.summary_label }}</strong>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 <section id="taskListContainer">
   <div class="surface-panel toolbar-surface">
     <div class="section-heading">
