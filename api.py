@@ -3,6 +3,7 @@ from flask_restful import Api, Resource
 from datetime import datetime
 from flask_login import login_required, current_user
 from models import db, Task
+from task_ordering import append_task_to_parent
 
 api_bp = Blueprint('api', __name__)
 api = Api(api_bp)
@@ -32,6 +33,7 @@ class UpdateTask(Resource):
             abort(403)
         data = request.get_json() or {}
         task = db.get_or_404(Task, data.get('id'))
+        original_parent_id = task.parent_id
         if 'name' in data:
             task.name = data['name']
         if 'start_date' in data:
@@ -50,6 +52,8 @@ class UpdateTask(Resource):
             task.assignee_id = data['assignee_id']
         if 'parent_id' in data:
             task.parent_id = data['parent_id']
+        if task.parent_id != original_parent_id:
+            append_task_to_parent(task)
         db.session.commit()
         return {'status': 'ok'}
 

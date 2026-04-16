@@ -50,6 +50,7 @@ class Task(db.Model):
     release_version = db.Column(db.String(100))
     progress = db.Column(db.Integer, nullable=False, default=0)
     parent_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)
+    order_index = db.Column(db.Integer, nullable=False, default=0)
     assignee_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)
     # relationships
     children = db.relationship(

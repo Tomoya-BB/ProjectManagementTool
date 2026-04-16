@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from models import db, Task, User, Project, Resource, Member, TaskDependency
 from api import api_bp
+from task_ordering import append_task_to_parent, move_task_within_siblings, sort_tasks_hierarchically
 
 app = Flask(__name__)
 app.secret_key = 'dev'
@@ -108,11 +109,13 @@ def compute_gantt(tasks):
     import pandas as pd
     import plotly.express as px
 
+    ordered_tasks = sort_tasks_hierarchically(tasks)
     records = []
-    for t in tasks:
+    for t in ordered_tasks:
+        display_prefix = "└ " * getattr(t, "display_depth", 0)
         records.append({
             'id': t.id,
-            'Task': t.name,
+            'Task': f"{display_prefix}{t.name}",
             'Start': t.start_date,
             'Finish': t.end_date,
             'Progress': t.progress,
@@ -147,12 +150,30 @@ def compute_gantt(tasks):
     )
     fig.update_traces(textposition='inside', insidetextanchor='middle')
     fig.update_traces(customdata=df[['id']])
-    fig.update_yaxes(autorange='reversed')
+    fig.update_yaxes(
+        autorange='reversed',
+        categoryorder='array',
+        categoryarray=df['Task'].tolist(),
+    )
+    min_start = df['Start'].min()
+    max_finish = df['Finish'].max()
+    current_day = min_start
+    while current_day <= max_finish:
+        fig.add_vline(
+            x=current_day,
+            line_width=1.4 if current_day.day == 1 else 0.8,
+            line_color='rgba(20, 33, 61, 0.18)' if current_day.day == 1 else 'rgba(20, 33, 61, 0.08)',
+        )
+        current_day += timedelta(days=1)
     fig.update_layout(
         height=max(360, 72 * len(df) + 120),
         margin=dict(l=24, r=24, t=24, b=24),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(255,255,255,0.92)',
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        tickformat='%m/%d',
     )
     return fig.to_html(
         full_html=False,
@@ -246,6 +267,11 @@ def init_db(project_name, db_path=None):
         if 'release_version' not in cols:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE tasks ADD COLUMN release_version VARCHAR"))
+        if 'order_index' not in cols:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE tasks ADD COLUMN order_index INTEGER DEFAULT 0'))
+        with engine.begin() as conn:
+            conn.execute(text('UPDATE tasks SET order_index = id WHERE order_index IS NULL OR order_index = 0'))
 
         user_engine = db.engines['users']
         with user_engine.connect() as conn:
@@ -528,6 +554,7 @@ def tasks():
                     remarks=remarks, release_version=release_version,
                     progress=progress,
                     assignee_id=assignee_id, parent_id=parent_id)
+        append_task_to_parent(task)
         db.session.add(task)
         db.session.commit()
         predecessors = request.form.getlist('predecessors')
@@ -544,7 +571,7 @@ def tasks():
 
     release = request.args.get('release')
     assignee = request.args.get('assignee', type=int)
-    sort_by = request.args.get('sort', 'start_date')
+    sort_by = request.args.get('sort', 'manual')
 
     query = Task.query
     if release:
@@ -556,10 +583,13 @@ def tasks():
         query = query.order_by(Task.release_version, Task.start_date)
     elif sort_by == 'assignee':
         query = query.outerjoin(Member, Task.assignee).order_by(Member.name.is_(None), Member.name, Task.start_date)
+    elif sort_by == 'manual':
+        tasks = sort_tasks_hierarchically(query.all())
     else:
         query = query.order_by(Task.start_date)
-
-    tasks = query.all()
+        tasks = query.all()
+    if sort_by != 'manual':
+        tasks = query.all()
     members = Member.query.all()
     releases = [r[0] for r in db.session.query(Task.release_version).distinct().all() if r[0]]
     deps = TaskDependency.query.all()
@@ -607,6 +637,7 @@ def add_task():
             depends_on_id=depends_on_id,
             is_milestone=is_milestone,
         )
+        append_task_to_parent(task)
         db.session.add(task)
         db.session.commit()
         flash('Task added', 'success')
@@ -623,6 +654,7 @@ def edit_task(task_id):
     if current_user.role == 'Viewer':
         abort(403)
     if request.method == 'POST':
+        original_parent_id = task.parent_id
         task.name = request.form['name']
         task.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
@@ -634,6 +666,8 @@ def edit_task(task_id):
         task.progress = int(request.form.get('progress', task.progress))
         task.assignee_id = request.form.get('assignee_id', type=int)
         task.parent_id = request.form.get('parent_id', type=int)
+        if task.parent_id != original_parent_id:
+            append_task_to_parent(task)
         task.is_milestone = 'is_milestone' in request.form
         if task.is_milestone:
             task.end_date = task.start_date
@@ -669,6 +703,18 @@ def delete_task(task_id):
     return redirect(url_for('tasks'))
 
 
+@app.route('/task/<int:task_id>/move', methods=['POST'])
+@login_required
+@roles_required('Admin', 'Editor')
+def move_task(task_id):
+    task = db.get_or_404(Task, task_id)
+    direction = request.form.get('direction', '')
+    move_task_within_siblings(task, direction)
+    db.session.commit()
+    next_url = request.form.get('next') or url_for('tasks')
+    return redirect(next_url)
+
+
 @app.route('/task/update', methods=['POST'])
 @login_required
 @roles_required('Admin', 'Editor')
@@ -676,6 +722,7 @@ def update_task():
     data = request.get_json()
     task_id = data.get('id')
     task = db.get_or_404(Task, task_id)
+    original_parent_id = task.parent_id
     task.name = data.get('name', task.name)
     start_value = data.get('start_date')
     end_value = data.get('end_date')
@@ -690,6 +737,8 @@ def update_task():
     task.progress = int(data.get('progress', task.progress))
     task.assignee_id = data.get('assignee_id') or None
     task.parent_id = data.get('parent_id') or None
+    if task.parent_id != original_parent_id:
+        append_task_to_parent(task)
     task.is_milestone = data.get('is_milestone', False)
     if task.is_milestone:
         task.end_date = task.start_date
