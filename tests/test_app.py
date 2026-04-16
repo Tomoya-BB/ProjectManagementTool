@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 TEST_ROOT = tempfile.mkdtemp(prefix="pmt-tests-")
 os.environ.setdefault("PMT_DATA_DIR", os.path.join(TEST_ROOT, "data"))
@@ -51,12 +51,21 @@ class ProjectManagementToolTestCase(unittest.TestCase):
             db.session.commit()
             return member.id
 
-    def create_task(self, name, assignee_id=None, release_version=None, progress=0, parent_id=None):
+    def create_task(
+        self,
+        name,
+        assignee_id=None,
+        release_version=None,
+        progress=0,
+        parent_id=None,
+        start_date=None,
+        end_date=None,
+    ):
         with self.app.app_context():
             task = Task(
                 name=name,
-                start_date=date(2026, 4, 1),
-                end_date=date(2026, 4, 5),
+                start_date=start_date or date(2026, 4, 1),
+                end_date=end_date or date(2026, 4, 5),
                 remarks=f"remarks for {name}",
                 release_version=release_version,
                 progress=progress,
@@ -290,6 +299,121 @@ class ProjectManagementToolTestCase(unittest.TestCase):
 
         self.assertIn("Alice (v1.0)", html)
         self.assertIn("rgba(20, 33, 61, 0.08)", html)
+
+    def test_compute_member_availability_tracks_busy_and_free_members(self):
+        with self.app.app_context():
+            alice = Member(name="Alice")
+            bob = Member(name="Bob")
+            carol = Member(name="Carol")
+            db.session.add_all([alice, bob, carol])
+            db.session.flush()
+            db.session.add_all([
+                Task(
+                    name="Alice active",
+                    start_date=date(2026, 4, 1),
+                    end_date=date(2026, 4, 3),
+                    progress=10,
+                    assignee_id=alice.id,
+                ),
+                Task(
+                    name="Alice next",
+                    start_date=date(2026, 4, 4),
+                    end_date=date(2026, 4, 5),
+                    progress=0,
+                    assignee_id=alice.id,
+                ),
+                Task(
+                    name="Carol future",
+                    start_date=date(2026, 4, 10),
+                    end_date=date(2026, 4, 12),
+                    progress=0,
+                    assignee_id=carol.id,
+                ),
+            ])
+            db.session.commit()
+
+            availability = app_module.compute_member_availability(
+                Member.query.order_by(Member.name).all(),
+                Task.query.order_by(Task.id).all(),
+                reference_date=date(2026, 4, 2),
+            )
+
+        alice_slot = next(slot for slot in availability if slot["member"].name == "Alice")
+        bob_slot = next(slot for slot in availability if slot["member"].name == "Bob")
+        carol_slot = next(slot for slot in availability if slot["member"].name == "Carol")
+
+        self.assertTrue(alice_slot["is_busy_today"])
+        self.assertEqual(alice_slot["next_available_label"], "2026-04-06")
+        self.assertEqual(alice_slot["next_task_label"], "2026-04-04 から")
+        self.assertEqual(alice_slot["scheduled_days"], 4)
+        self.assertFalse(bob_slot["is_busy_today"])
+        self.assertEqual(bob_slot["next_available_label"], "今日")
+        self.assertEqual(bob_slot["next_task_label"], "予定なし")
+        self.assertEqual(carol_slot["next_task_label"], "2026-04-10 から")
+
+    def test_build_member_schedule_rows_marks_busy_overbooked_and_free_days(self):
+        with self.app.app_context():
+            alice = Member(name="Alice")
+            bob = Member(name="Bob")
+            db.session.add_all([alice, bob])
+            db.session.flush()
+            db.session.add_all([
+                Task(
+                    name="Alice day 1",
+                    start_date=date(2026, 4, 2),
+                    end_date=date(2026, 4, 3),
+                    progress=20,
+                    assignee_id=alice.id,
+                ),
+                Task(
+                    name="Alice overlap",
+                    start_date=date(2026, 4, 3),
+                    end_date=date(2026, 4, 4),
+                    progress=0,
+                    assignee_id=alice.id,
+                ),
+            ])
+            db.session.commit()
+
+            schedule_days, schedule_rows = app_module.build_member_schedule_rows(
+                Member.query.order_by(Member.name).all(),
+                Task.query.order_by(Task.id).all(),
+                start_date=date(2026, 4, 2),
+                days=3,
+            )
+
+        self.assertEqual(schedule_days[0], date(2026, 4, 2))
+        self.assertEqual(schedule_days[-1], date(2026, 4, 4))
+        alice_row = next(row for row in schedule_rows if row["member"].name == "Alice")
+        bob_row = next(row for row in schedule_rows if row["member"].name == "Bob")
+
+        self.assertEqual(alice_row["cells"][0]["cell_class"], "schedule-cell-busy")
+        self.assertEqual(alice_row["cells"][1]["cell_class"], "schedule-cell-overbooked")
+        self.assertEqual(alice_row["cells"][1]["summary_label"], "2件")
+        self.assertEqual(alice_row["cells"][2]["task_names"], ["Alice overlap"])
+        self.assertEqual(bob_row["cells"][0]["cell_class"], "schedule-cell-free")
+        self.assertEqual(bob_row["cells"][0]["summary_label"], "空")
+
+    def test_tasks_page_shows_member_availability_summary(self):
+        self.create_user("admin")
+        alice_id = self.create_member("Alice")
+        self.create_member("Bob")
+        today = date.today()
+        self.create_task(
+            "Assigned task",
+            assignee_id=alice_id,
+            start_date=today,
+            end_date=today + timedelta(days=2),
+        )
+
+        self.login_and_open_project()
+        response = self.client.get("/tasks")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("メンバー空き状況".encode(), response.data)
+        self.assertIn("メンバー予定表".encode(), response.data)
+        self.assertIn("今日 1 件対応中".encode(), response.data)
+        self.assertIn("未割り当てなので、すぐにアサインできます。".encode(), response.data)
 
     def test_tasks_page_groups_children_under_parent_in_manual_sort(self):
         self.create_user("admin")
