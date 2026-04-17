@@ -107,6 +107,35 @@ class ProjectManagementToolTestCase(unittest.TestCase):
             self.assertIsNotNone(user)
             self.assertEqual(user.role, "Admin")
 
+    def test_app_uses_environment_secret_key_when_provided(self):
+        previous_pmt_secret = os.environ.get("PMT_SECRET_KEY")
+        previous_secret = os.environ.get("SECRET_KEY")
+        try:
+            os.environ["PMT_SECRET_KEY"] = "pmt-secret-for-test"
+            os.environ["SECRET_KEY"] = "generic-secret-for-test"
+            self.assertEqual(
+                app_module.resolve_secret_key(),
+                "pmt-secret-for-test",
+            )
+
+            os.environ.pop("PMT_SECRET_KEY", None)
+            self.assertEqual(
+                app_module.resolve_secret_key(),
+                "generic-secret-for-test",
+            )
+
+            os.environ.pop("SECRET_KEY", None)
+            self.assertEqual(app_module.resolve_secret_key(), "dev")
+        finally:
+            if previous_pmt_secret is None:
+                os.environ.pop("PMT_SECRET_KEY", None)
+            else:
+                os.environ["PMT_SECRET_KEY"] = previous_pmt_secret
+            if previous_secret is None:
+                os.environ.pop("SECRET_KEY", None)
+            else:
+                os.environ["SECRET_KEY"] = previous_secret
+
     def test_viewer_can_select_project_and_view_tasks(self):
         self.create_user("viewer", role="Viewer")
 
