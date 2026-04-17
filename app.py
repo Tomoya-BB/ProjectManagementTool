@@ -778,10 +778,11 @@ def add_task():
         if end_date < start_date:
             flash('End date cannot be before start date.', 'danger')
             return redirect(url_for('add_task'))
+        remarks = request.form.get('remarks', '')
         progress = int(request.form.get('progress') or 0)
         release_version = request.form.get('release_version')
-        assignee_id = request.form.get('assignee_id') or None
-        depends_on_id = request.form.get('depends_on_id') or None
+        assignee_id = request.form.get('assignee_id', type=int)
+        parent_id = request.form.get('parent_id', type=int)
         is_milestone = 'is_milestone' in request.form
         if is_milestone:
             end_date = start_date
@@ -789,20 +790,35 @@ def add_task():
             name=name,
             start_date=start_date,
             end_date=end_date,
+            remarks=remarks,
             release_version=release_version,
             progress=progress,
             assignee_id=assignee_id,
-            depends_on_id=depends_on_id,
+            parent_id=parent_id,
             is_milestone=is_milestone,
         )
         append_task_to_parent(task)
         db.session.add(task)
+        db.session.flush()
+        for pid in request.form.getlist('predecessors'):
+            try:
+                pid = int(pid)
+            except ValueError:
+                continue
+            if pid and pid != task.id:
+                db.session.add(TaskDependency(predecessor_id=pid, successor_id=task.id))
         db.session.commit()
         flash('Task added', 'success')
         return redirect(url_for('tasks'))
     tasks = Task.query.all()
     members = Member.query.all()
-    return render_template('form.html', task=None, tasks=tasks, members=members)
+    return render_template(
+        'form.html',
+        task=None,
+        tasks=tasks,
+        members=members,
+        selected_predecessor_ids=set(),
+    )
 
 
 @app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
@@ -844,8 +860,16 @@ def edit_task(task_id):
         return redirect(url_for('tasks'))
     tasks = Task.query.filter(Task.id != task_id).all()
     members = Member.query.all()
-    deps = TaskDependency.query.all()
-    return render_template('form.html', task=task, tasks=tasks, members=members, deps=deps)
+    selected_predecessor_ids = {
+        dep.predecessor_id for dep in TaskDependency.query.filter_by(successor_id=task.id).all()
+    }
+    return render_template(
+        'form.html',
+        task=task,
+        tasks=tasks,
+        members=members,
+        selected_predecessor_ids=selected_predecessor_ids,
+    )
 
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])

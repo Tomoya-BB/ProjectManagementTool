@@ -1,50 +1,63 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1 class="mb-4">{{ 'Edit Task' if task else 'Add Task' }}</h1>
+<h1 class="mb-4">{{ 'タスク編集' if task else 'タスク追加' }}</h1>
 <form method="post" id="taskForm">
     <div class="mb-3">
-        <label class="form-label">Name</label>
+        <label class="form-label">タスク名</label>
         <input type="text" name="name" value="{{ task.name if task else '' }}" class="form-control" required>
     </div>
     <div class="mb-3">
-        <label class="form-label">Start Date</label>
+        <label class="form-label">開始日</label>
         <input type="date" name="start_date" value="{{ task.start_date if task else '' }}" class="form-control" required>
     </div>
     <div class="mb-3">
-        <label class="form-label">End Date</label>
+        <label class="form-label">終了日</label>
         <input type="date" name="end_date" value="{{ task.end_date if task else '' }}" class="form-control" required>
     </div>
     <div class="mb-3">
-        <label class="form-label">Release Version</label>
+        <label class="form-label">備考</label>
+        <textarea name="remarks" class="form-control" rows="3" placeholder="補足や依存条件を記載">{{ task.remarks if task else '' }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">リリース</label>
         <input type="text" name="release_version" value="{{ task.release_version if task else '' }}" class="form-control">
     </div>
     <div class="mb-3">
-        <label class="form-label">Assignee</label>
+        <label class="form-label">担当者</label>
         <select name="assignee_id" class="form-select">
-            <option value="">-- None --</option>
+            <option value="">-- 未設定 --</option>
             {% for m in members %}
             <option value="{{ m.id }}" {% if task and task.assignee_id == m.id %}selected{% endif %}>{{ m.name }}</option>
             {% endfor %}
         </select>
     </div>
     <div class="mb-3">
-        <label class="form-label">Depends On</label>
-        <select name="depends_on_id" class="form-select">
-            <option value="">-- None --</option>
-            {% for t in tasks %}
-            <option value="{{ t.id }}" {% if task and task.depends_on_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+        <label class="form-label">親タスク</label>
+        <select name="parent_id" class="form-select">
+            <option value="">-- なし --</option>
+            {% for t in tasks if not t.parent_id %}
+            <option value="{{ t.id }}" {% if task and task.parent_id == t.id %}selected{% endif %}>{{ t.name }}</option>
             {% endfor %}
         </select>
     </div>
+    <div class="mb-3">
+        <label class="form-label">先行タスク</label>
+        <select name="predecessors" multiple class="form-select form-select-multi">
+            {% for t in tasks %}
+            <option value="{{ t.id }}" {% if t.id in selected_predecessor_ids %}selected{% endif %}>{{ t.name }}</option>
+            {% endfor %}
+        </select>
+        <small class="form-hint">開始前に完了している必要があるタスクを選択します。</small>
+    </div>
     <div class="form-check mb-3">
         <input type="checkbox" name="is_milestone" class="form-check-input" id="milestone" {% if task and task.is_milestone %}checked{% endif %}>
-        <label for="milestone" class="form-check-label">Milestone</label>
+        <label for="milestone" class="form-check-label">マイルストーン</label>
     </div>
     <div class="mb-3">
-        <label class="form-label">Progress (%)</label>
+        <label class="form-label">進捗率 (%)</label>
         <input type="range" name="progress" id="progress" class="form-range" min="0" max="100" value="{{ task.progress if task else 0 }}" oninput="progressValue.value = progress.value">
         <output id="progressValue">{{ task.progress if task else 0 }}</output>%
     </div>
-    <button type="submit" class="btn btn-primary">Save</button>
+    <button type="submit" class="btn btn-primary">{{ '更新' if task else '追加' }}</button>
 </form>
 {% endblock %}

@@ -258,6 +258,84 @@ class ProjectManagementToolTestCase(unittest.TestCase):
             self.assertEqual(task.progress, 80)
             self.assertEqual(task.remarks, "updated")
 
+    def test_direct_edit_route_preserves_remarks_parent_and_predecessors(self):
+        self.create_user("admin")
+        member_id = self.create_member("Editor Owner")
+        parent_id = self.create_task("Parent task")
+        predecessor_id = self.create_task("Predecessor task")
+        task_id = self.create_task(
+            "Edit target",
+            assignee_id=member_id,
+            release_version="v1.0",
+            progress=25,
+            parent_id=parent_id,
+        )
+        with self.app.app_context():
+            db.session.add(TaskDependency(predecessor_id=predecessor_id, successor_id=task_id))
+            db.session.commit()
+
+        self.login_and_open_project()
+        response = self.client.post(
+            f"/task/{task_id}/edit",
+            data={
+                "name": "Edit target updated",
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-05",
+                "remarks": "kept from direct edit",
+                "release_version": "v1.0",
+                "progress": "25",
+                "assignee_id": str(member_id),
+                "parent_id": str(parent_id),
+                "predecessors": str(predecessor_id),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            task = db.session.get(Task, task_id)
+            self.assertEqual(task.name, "Edit target updated")
+            self.assertEqual(task.remarks, "kept from direct edit")
+            self.assertEqual(task.parent_id, parent_id)
+            self.assertEqual(
+                TaskDependency.query.filter_by(successor_id=task_id, predecessor_id=predecessor_id).count(),
+                1,
+            )
+
+    def test_direct_add_route_supports_remarks_parent_and_predecessors(self):
+        self.create_user("admin")
+        member_id = self.create_member("Add Owner")
+        parent_id = self.create_task("Parent task")
+        predecessor_id = self.create_task("Predecessor task")
+
+        self.login_and_open_project()
+        response = self.client.post(
+            "/task/add",
+            data={
+                "name": "Added from direct form",
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-04",
+                "remarks": "created from direct add",
+                "release_version": "v3.2",
+                "progress": "40",
+                "assignee_id": str(member_id),
+                "parent_id": str(parent_id),
+                "predecessors": str(predecessor_id),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            task = Task.query.filter_by(name="Added from direct form").one()
+            self.assertEqual(task.remarks, "created from direct add")
+            self.assertEqual(task.parent_id, parent_id)
+            self.assertEqual(task.assignee_id, member_id)
+            self.assertEqual(
+                TaskDependency.query.filter_by(successor_id=task.id, predecessor_id=predecessor_id).count(),
+                1,
+            )
+
     def test_inline_task_update_accepts_partial_payload(self):
         self.create_user("admin")
         task_id = self.create_task("Inline update task", progress=10)
