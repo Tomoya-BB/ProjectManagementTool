@@ -15,8 +15,12 @@ from models import db, Task, User, Project, Resource, Member, TaskDependency
 from api import api_bp
 from task_ordering import append_task_to_parent, move_task_within_siblings, sort_tasks_hierarchically
 
+def resolve_secret_key():
+    return os.environ.get('PMT_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'dev'
+
+
 app = Flask(__name__)
-app.secret_key = 'dev'
+app.secret_key = resolve_secret_key()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Keep track of currently opened project directory
